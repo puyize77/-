@@ -2,9 +2,9 @@
 
 一个无需安装前端依赖的响应式网页工具，适合在电脑和手机浏览器中使用。它可以录入初中体测原始成绩，计算单项分、加权总分和等级，并按班级统计平均分、优秀率、优良率、及格率和等级分布。
 
-在线使用：<https://junior-sports-score.wholewood8.chatgpt.site>
+在线使用（GitHub Pages）：<https://puyize77.github.io/->
 
-如果上面的在线地址被网络安全服务拦截，可在 GitHub 仓库的 **Settings → Pages** 中选择 `Deploy from a branch`，分支选择 `gh-pages`、目录选择 `/ (root)`，保存后使用 GitHub Pages 生成的新地址。
+备用地址：<https://junior-sports-score.wholewood8.chatgpt.site>（部分网络可能会被 Cloudflare 拦截）。
 
 ## 已实现功能
 
