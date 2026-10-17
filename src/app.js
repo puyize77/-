@@ -130,9 +130,12 @@ function collectForm() {
 
 function calculatedRecord(form) {
   const result = calculateStudent(form);
+  const existing = records.find((record) => record.id === form.id);
+  const rosterOrder = form.rosterOrder ?? existing?.rosterOrder ?? rosterNextOrder();
   return {
     ...form,
     gradeLevel: form.gradeLevel || form.grade || "初三",
+    rosterOrder,
     scores: Object.fromEntries(EVENT_ORDER.map((eventId) => {
       const value = form.scores[eventId];
       return [eventId, value === "" || value === null || value === undefined ? null : Number(value)];
@@ -483,6 +486,10 @@ init();
 // Roster-based, project-by-project testing workflow.
 let rosterCurrentId = null;
 let rosterSaveTimer = null;
+
+function rosterNextOrder() {
+  return records.reduce((max, record) => Math.max(max, Number(record.rosterOrder) || 0), 0) + 1;
+}
 
 function rosterHasScore(record, eventId) {
   const value = record.scores?.[eventId];
