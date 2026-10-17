@@ -120,7 +120,7 @@ function collectForm() {
     id: editingId || makeId(),
     name: $("#student-name").value.trim(),
     className: $("#class-name").value.trim(),
-    grade: $("#grade").value || "初三",
+    gradeLevel: $("#grade").value || "初三",
     gender: $("#gender").value,
     status: $("#status").value,
     bonus: $("#bonus").value,
@@ -132,6 +132,7 @@ function calculatedRecord(form) {
   const result = calculateStudent(form);
   return {
     ...form,
+    gradeLevel: form.gradeLevel || form.grade || "初三",
     scores: Object.fromEntries(EVENT_ORDER.map((eventId) => [eventId, form.scores[eventId] === "" ? null : Number(form.scores[eventId])])),
     total: result.total,
     baseTotal: result.baseTotal,
@@ -187,7 +188,7 @@ function fillForm(record) {
   $("#submit-record").textContent = "更新记录";
   $("#student-name").value = record.name || "";
   $("#class-name").value = record.className || "";
-  $("#grade").value = record.grade || "初三";
+  $("#grade").value = record.gradeLevel || "初三";
   $("#gender").value = record.gender || "male";
   $("#status").value = record.status || "active";
   $("#bonus").value = record.bonus || 0;
@@ -204,13 +205,13 @@ function renderRecords() {
   const search = $("#search-input").value.trim().toLowerCase();
   const classFilter = $("#filter-class").value;
   const filtered = records.filter((record) => {
-    const matchesText = !search || [record.name, record.className, record.grade].some((value) => String(value || "").toLowerCase().includes(search));
+    const matchesText = !search || [record.name, record.className, record.gradeLevel, record.grade].some((value) => String(value || "").toLowerCase().includes(search));
     const matchesClass = !classFilter || record.className === classFilter;
     return matchesText && matchesClass;
   });
   $("#records-body").innerHTML = filtered.map((record) => `
     <tr>
-      <td><strong>${escapeHtml(record.name)}</strong><small>${escapeHtml(record.grade || "")}</small></td>
+      <td><strong>${escapeHtml(record.name)}</strong><small>${escapeHtml(record.gradeLevel || "")}</small></td>
       <td>${escapeHtml(record.className || "—")}</td>
       <td>${record.gender === "female" ? "女" : "男"}</td>
       <td><span class="status-chip ${record.status}">${statusLabels[record.status] || record.status}</span></td>
@@ -275,7 +276,7 @@ function exportCsv() {
   const lines = records.map((record) => [
     record.name,
     record.className,
-    record.grade,
+    record.gradeLevel || "初三",
     record.gender === "female" ? "女" : "男",
     statusLabels[record.status] || record.status,
     ...EVENT_ORDER.map((eventId) => record.scores?.[eventId] ?? ""),
@@ -342,7 +343,7 @@ function importCsvText(text) {
     const gender = ["女", "female", "女生"].includes(genderText) ? "female" : "male";
     const status = Object.entries(statusLabels).find(([, label]) => label === statusText)?.[0] || (Object.keys(statusLabels).includes(statusText) ? statusText : "active");
     const scores = Object.fromEntries(EVENT_ORDER.map((eventId) => [eventId, cellAt(eventId) === "" ? null : Number(cellAt(eventId))]));
-    const raw = { id: makeId(), name: cellAt("name"), className: cellAt("className"), grade: cellAt("grade") || "初三", gender, status, bonus: cellAt("bonus") || 0, scores };
+    const raw = { id: makeId(), name: cellAt("name"), className: cellAt("className"), gradeLevel: cellAt("grade") || "初三", gender, status, bonus: cellAt("bonus") || 0, scores };
     return calculatedRecord(raw);
   }).filter((record) => record.name);
 }
@@ -383,6 +384,8 @@ function bindEvents() {
     saveRecords();
     renderResult(record);
     renderRecords();
+    rosterRenderProject();
+    rosterRenderFinal();
     renderAnalysis();
     showMessage("#form-message", existingIndex >= 0 ? "记录已更新。" : "记录已保存。", "success");
     editingId = record.id;
@@ -402,6 +405,8 @@ function bindEvents() {
       saveRecords();
       if (editingId === record.id) resetForm();
       renderRecords();
+      rosterRenderProject();
+      rosterRenderFinal();
       renderAnalysis();
     }
   });
@@ -431,6 +436,8 @@ function bindEvents() {
     saveRecords();
     resetForm();
     renderRecords();
+    rosterRenderProject();
+    rosterRenderFinal();
     renderAnalysis();
   });
   $("#load-demo").addEventListener("click", () => {
@@ -504,7 +511,7 @@ function rosterNormalizeRecords() {
       id: record.id || makeId(),
       name: String(record.name || "").trim(),
       className: String(record.className || "").trim(),
-      grade: record.grade || "初三",
+      gradeLevel: record.gradeLevel || record.grade || "初三",
       gender: record.gender === "female" ? "female" : "male",
       status: statusLabels[record.status] ? record.status : "pending",
       bonus: Number(record.bonus) || 0,
@@ -516,7 +523,7 @@ function rosterNormalizeRecords() {
     };
     normalized.status = rosterDerivedStatus(normalized);
     const result = calculateStudent({ scores: normalized.scores, standard, gender: normalized.gender, status: normalized.status, bonus: normalized.bonus });
-    return { ...normalized, total: result.total, baseTotal: result.baseTotal, bonus: result.bonus, grade: result.grade, gradeTone: result.gradeTone, itemResults: result.itemResults, updatedAt: record.updatedAt || new Date().toISOString() };
+    return { ...normalized, grade: result.grade, total: result.total, baseTotal: result.baseTotal, bonus: result.bonus, gradeTone: result.gradeTone, itemResults: result.itemResults, updatedAt: record.updatedAt || new Date().toISOString() };
   });
   saveRecords();
 }
@@ -580,7 +587,7 @@ function rosterRenderProjectCurrent(rows) {
   studentSelect.value = current ? current.id : "";
   $("#project-student-name").textContent = current ? current.name : "请先导入测试名单";
   $("#project-student-meta").textContent = current
-    ? current.className + " · " + current.grade + " · " + (current.gender === "female" ? "女" : "男") + " · 已完成 " + rosterCompletion(current) + "/" + EVENT_ORDER.length + " 项 · 名单顺序 " + (index + 1)
+    ? current.className + " · " + (current.gradeLevel || "初三") + " · " + (current.gender === "female" ? "女" : "男") + " · 已完成 " + rosterCompletion(current) + "/" + EVENT_ORDER.length + " 项 · 名单顺序 " + (index + 1)
     : "导入名单后，系统会按照名单顺序准备测试对象。";
   const scoreInput = $("#project-score-input");
   const statusSelect = $("#project-status");
@@ -631,7 +638,7 @@ function rosterRenderFinal() {
   });
   $("#final-table-body").innerHTML = rows.map((record, index) => {
     const scoreCells = EVENT_ORDER.map((eventId) => '<td>' + (record.scores?.[eventId] === null || record.scores?.[eventId] === undefined ? "—" : formatNumber(record.scores[eventId])) + "</td>").join("");
-    return "<tr><td>" + (index + 1) + "</td><td><strong>" + escapeHtml(record.name) + "</strong><small>" + escapeHtml(record.grade) + "</small></td><td>" + escapeHtml(record.className) + "</td><td>" + (record.gender === "female" ? "女" : "男") + "</td><td><span class=\"status-chip " + record.status + "\">" + (statusLabels[record.status] || record.status) + "</span></td>" + scoreCells + "<td>" + (record.total === null || record.total === undefined ? "—" : formatNumber(record.total)) + "</td><td><span class=\"grade-pill " + (record.gradeTone || "neutral") + "\">" + (record.grade || "—") + "</span></td></tr>";
+    return "<tr><td>" + (index + 1) + "</td><td><strong>" + escapeHtml(record.name) + "</strong><small>" + escapeHtml(record.gradeLevel || "初三") + "</small></td><td>" + escapeHtml(record.className) + "</td><td>" + (record.gender === "female" ? "女" : "男") + "</td><td><span class=\"status-chip " + record.status + "\">" + (statusLabels[record.status] || record.status) + "</span></td>" + scoreCells + "<td>" + (record.total === null || record.total === undefined ? "—" : formatNumber(record.total)) + "</td><td><span class=\"grade-pill " + (record.gradeTone || "neutral") + "\">" + (record.grade || "—") + "</span></td></tr>";
   }).join("");
   $("#final-empty").classList.toggle("hidden", rows.length > 0);
   rosterUpdateFinalClasses();
@@ -720,7 +727,7 @@ function rosterImportListText(text) {
     const grade = cellAt(row, indexes.grade) || "初三";
     const gender = ["女", "female", "女生"].includes(cellAt(row, indexes.gender)) ? "female" : "male";
     const importedStatus = statusFromText(cellAt(row, indexes.status), "pending");
-    const existing = records.find((record) => record.name === name && record.className === className && record.grade === grade);
+    const existing = records.find((record) => record.name === name && record.className === className && (record.gradeLevel || record.grade) === grade);
     if (existing) {
       existing.gender = gender;
       if (importedStatus === "absent" || importedStatus === "exempt") existing.status = importedStatus;
@@ -728,7 +735,7 @@ function rosterImportListText(text) {
       return;
     }
     records.push({
-      id: makeId(), name, className, grade, gender,
+      id: makeId(), name, className, gradeLevel: grade, gender,
       status: importedStatus === "absent" || importedStatus === "exempt" ? importedStatus : "pending",
       bonus: 0, rosterOrder: Number(cellAt(row, indexes.order)) || orderBase + rowIndex,
       scores: Object.fromEntries(EVENT_ORDER.map((eventId) => [eventId, null])),
