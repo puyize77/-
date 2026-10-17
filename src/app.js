@@ -475,7 +475,8 @@ let rosterCurrentId = null;
 let rosterSaveTimer = null;
 
 function rosterHasScore(record, eventId) {
-  return Number.isFinite(Number(record.scores?.[eventId]));
+  const value = record.scores?.[eventId];
+  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 }
 
 function rosterHasAnyScore(record) {
