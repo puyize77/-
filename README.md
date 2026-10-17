@@ -4,6 +4,8 @@
 
 在线使用：<https://junior-sports-score.wholewood8.chatgpt.site>
 
+如果上面的在线地址被网络安全服务拦截，可在 GitHub 仓库的 **Settings → Pages** 中选择 `Deploy from a branch`，分支选择 `gh-pages`、目录选择 `/ (root)`，保存后使用 GitHub Pages 生成的新地址。
+
 ## 已实现功能
 
 - 录入姓名、班级、年级、性别、成绩状态和附加分。
