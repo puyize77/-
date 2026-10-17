@@ -27,7 +27,9 @@
       </section>
 
       <nav class="tabs" aria-label="功能导航">
-        <button type="button" data-tab="input" class="active">录入评分</button>
+        <button type="button" data-tab="input" class="active">单人录入</button>
+        <button type="button" data-tab="project">分项目测试</button>
+        <button type="button" data-tab="final">成绩表</button>
         <button type="button" data-tab="analysis">班级分析</button>
         <button type="button" data-tab="settings">评分设置</button>
       </nav>
@@ -48,7 +50,7 @@
                   <label class="field" for="class-name"><span>班级</span><input id="class-name" required placeholder="例如：九年级1班" /></label>
                   <label class="field" for="grade"><span>年级</span><select id="grade"><option>初一</option><option>初二</option><option selected>初三</option></select></label>
                   <label class="field" for="gender"><span>性别</span><select id="gender"><option value="male">男</option><option value="female">女</option></select></label>
-                  <label class="field" for="status"><span>成绩状态</span><select id="status"><option value="active">正常</option><option value="absent">缺考</option><option value="exempt">免测</option><option value="incomplete">缺项</option></select></label>
+                  <label class="field" for="status"><span>成绩状态</span><select id="status"><option value="pending">待测试</option><option value="active">正常</option><option value="absent">缺考</option><option value="exempt">免测</option><option value="incomplete">缺项</option></select></label>
                   <label class="field" for="bonus"><span>附加分 <small>默认 0</small></span><input id="bonus" type="number" min="0" step="0.1" value="0" placeholder="没有就填 0" /></label>
                 </div>
 
@@ -109,6 +111,99 @@
                 <tbody id="records-body"></tbody>
               </table>
               <div id="empty-records" class="empty-state">还没有记录，先在上方录入一名学生吧。</div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section data-panel="project">
+        <section class="card">
+          <div class="card-inner">
+            <div class="card-heading">
+              <div>
+                <h2>分项目测试台</h2>
+                <p>先导入全部测试名单，再选择今天要测试的项目。录入一人的成绩后会立即保存，下一节课换项目即可继续。</p>
+              </div>
+              <span id="roster-message" class="message" aria-live="polite"></span>
+            </div>
+
+            <div class="roster-actions">
+              <label class="button-secondary" for="roster-file">导入测试名单 CSV<input id="roster-file" type="file" accept=".csv,text/csv" hidden /></label>
+              <button id="download-roster-template" class="button-ghost" type="button">下载名单模板</button>
+              <span class="helper-text">表头至少包含：姓名、班级；可选：年级、性别、状态、序号。</span>
+            </div>
+
+            <div class="project-toolbar">
+              <label class="field compact-field" for="project-select"><span>当前测试项目</span><select id="project-select"></select></label>
+              <label class="field compact-field" for="project-class-filter"><span>班级</span><select id="project-class-filter"><option value="">全部班级</option></select></label>
+              <label class="field compact-field project-search" for="project-search"><span>查找学生</span><input id="project-search" placeholder="姓名或班级" /></label>
+            </div>
+
+            <div class="project-metrics">
+              <div class="metric"><small>名单人数</small><strong id="project-roster-count">0</strong></div>
+              <div class="metric"><small>本项目已录</small><strong id="project-completed-count">0</strong></div>
+              <div class="metric"><small>当前顺序</small><strong id="project-current-order">—</strong></div>
+              <div class="metric"><small>当前项目</small><strong id="project-current-label">—</strong></div>
+            </div>
+
+            <div class="project-workspace">
+              <section class="project-current card-subtle">
+                <p class="eyebrow">CURRENT STUDENT</p>
+                <h3 id="project-student-name">请先导入测试名单</h3>
+                <p id="project-student-meta" class="muted-line">导入名单后，系统会按照名单顺序准备测试对象。</p>
+                <label class="field" for="project-student-select"><span>选择当前学生</span><select id="project-student-select"><option value="">暂无学生</option></select></label>
+                <label class="field project-score-input" for="project-score-input"><span id="project-score-label">成绩</span><input id="project-score-input" type="number" inputmode="decimal" step="0.1" disabled placeholder="选择学生后输入" /></label>
+                <label class="field" for="project-status"><span>当前状态</span><select id="project-status" disabled><option value="pending">待测试</option><option value="active">正常</option><option value="incomplete">未完成</option><option value="absent">缺考</option><option value="exempt">免测</option></select></label>
+                <p id="project-auto-save" class="auto-save-note">输入成绩后会自动保存到当前浏览器。</p>
+                <div class="form-actions">
+                  <button id="project-prev" class="button-ghost" type="button">上一人</button>
+                  <button id="project-save-next" class="button-primary" type="button">保存并下一人</button>
+                  <button id="project-skip" class="button-ghost" type="button">跳过此人</button>
+                </div>
+              </section>
+
+              <section class="project-list card-subtle">
+                <div class="card-heading compact-heading">
+                  <div>
+                    <h3>测试名单顺序</h3>
+                    <p>点击“测试”可以直接切换当前学生。</p>
+                  </div>
+                </div>
+                <div class="table-wrap">
+                  <table class="records-table project-table">
+                    <thead><tr><th>顺序</th><th>学生</th><th>班级</th><th>本项目成绩</th><th>状态</th><th>操作</th></tr></thead>
+                    <tbody id="project-student-body"></tbody>
+                  </table>
+                  <div id="project-empty" class="empty-state">还没有名单，请先导入 CSV。</div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section data-panel="final">
+        <section class="card">
+          <div class="card-inner">
+            <div class="card-heading">
+              <div>
+                <h2>最终成绩表</h2>
+                <p>所有项目完成后，这里会自动生成完整成绩表；未完成项目会明确显示状态。</p>
+              </div>
+              <span id="final-message" class="message" aria-live="polite"></span>
+            </div>
+            <div class="toolbar">
+              <input id="final-search" placeholder="搜索姓名或班级" aria-label="搜索成绩表" />
+              <select id="final-class-filter" aria-label="按班级筛选成绩表"><option value="">全部班级</option></select>
+              <button id="export-final-csv" class="button-secondary" type="button">导出成绩表 CSV</button>
+            </div>
+            <p class="final-note">成绩表会随着分项目测试自动更新。导出的 CSV 可以继续在 Excel 中整理或打印。</p>
+            <div class="table-wrap">
+              <table class="records-table final-table">
+                <thead><tr><th>顺序</th><th>姓名</th><th>班级</th><th>性别</th><th>状态</th><th>BMI</th><th>肺活量</th><th>50米</th><th>体前屈</th><th>跳远</th><th>力量</th><th>耐力</th><th>总分</th><th>等级</th></tr></thead>
+                <tbody id="final-table-body"></tbody>
+              </table>
+              <div id="final-empty" class="empty-state">导入名单或录入成绩后，这里会生成成绩表。</div>
             </div>
           </div>
         </section>
