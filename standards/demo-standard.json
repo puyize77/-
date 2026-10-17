@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "title": "初中体测演示评分表（需替换）",
+  "note": "演示数据仅用于验证流程，不代表任何地区的正式评分标准。",
+  "totalMax": 100,
+  "weights": {
+    "bmi": 15,
+    "vitalCapacity": 15,
+    "sprint50": 20,
+    "sitReach": 10,
+    "longJump": 10,
+    "strength": 10,
+    "endurance": 20
+  },
+  "gradeBands": [
+    { "min": 90, "label": "优秀", "tone": "excellent" },
+    { "min": 80, "label": "良好", "tone": "good" },
+    { "min": 60, "label": "及格", "tone": "pass" },
+    { "min": 0, "label": "不及格", "tone": "fail" }
+  ],
+  "events": {
+    "bmi": {
+      "label": "BMI",
+      "unit": "",
+      "direction": "range",
+      "male": [
+        { "min": 17, "max": 23.9, "score": 100 },
+        { "min": 16, "max": 24.9, "score": 90 },
+        { "min": 15, "max": 27.9, "score": 80 },
+        { "min": 0, "max": 40, "score": 60 }
+      ],
+      "female": [
+        { "min": 17, "max": 23.9, "score": 100 },
+        { "min": 16, "max": 24.9, "score": 90 },
+        { "min": 15, "max": 27.9, "score": 80 },
+        { "min": 0, "max": 40, "score": 60 }
+      ]
+    },
+    "vitalCapacity": {
+      "label": "肺活量",
+      "unit": "毫升",
+      "direction": "higher",
+      "male": [
+        { "min": 5000, "score": 100 },
+        { "min": 4500, "score": 90 },
+        { "min": 4000, "score": 80 },
+        { "min": 3500, "score": 70 },
+        { "min": 3000, "score": 60 },
+        { "min": 0, "score": 40 }
+      ],
+      "female": [
+        { "min": 4000, "score": 100 },
+        { "min": 3500, "score": 90 },
+        { "min": 3000, "score": 80 },
+        { "min": 2600, "score": 70 },
+        { "min": 2200, "score": 60 },
+        { "min": 0, "score": 40 }
+      ]
+    },
+    "sprint50": {
+      "label": "50米跑",
+      "unit": "秒",
+      "direction": "lower",
+      "male": [
+        { "max": 7.2, "score": 100 },
+        { "max": 7.8, "score": 90 },
+        { "max": 8.4, "score": 80 },
+        { "max": 9, "score": 70 },
+        { "max": 9.6, "score": 60 },
+        { "max": 99, "score": 40 }
+      ],
+      "female": [
+        { "max": 8, "score": 100 },
+        { "max": 8.6, "score": 90 },
+        { "max": 9.2, "score": 80 },
+        { "max": 9.8, "score": 70 },
+        { "max": 10.4, "score": 60 },
+        { "max": 99, "score": 40 }
+      ]
+    },
+    "sitReach": {
+      "label": "坐位体前屈",
+      "unit": "厘米",
+      "direction": "higher",
+      "male": [
+        { "min": 20, "score": 100 },
+        { "min": 16, "score": 90 },
+        { "min": 12, "score": 80 },
+        { "min": 8, "score": 70 },
+        { "min": 4, "score": 60 },
+        { "min": -99, "score": 40 }
+      ],
+      "female": [
+        { "min": 22, "score": 100 },
+        { "min": 18, "score": 90 },
+        { "min": 14, "score": 80 },
+        { "min": 10, "score": 70 },
+        { "min": 6, "score": 60 },
+        { "min": -99, "score": 40 }
+      ]
+    },
+    "longJump": {
+      "label": "立定跳远",
+      "unit": "厘米",
+      "direction": "higher",
+      "male": [
+        { "min": 250, "score": 100 },
+        { "min": 230, "score": 90 },
+        { "min": 210, "score": 80 },
+        { "min": 190, "score": 70 },
+        { "min": 170, "score": 60 },
+        { "min": 0, "score": 40 }
+      ],
+      "female": [
+        { "min": 200, "score": 100 },
+        { "min": 180, "score": 90 },
+        { "min": 160, "score": 80 },
+        { "min": 140, "score": 70 },
+        { "min": 120, "score": 60 },
+        { "min": 0, "score": 40 }
+      ]
+    },
+    "strength": {
+      "label": "力量项目",
+      "unit": "次",
+      "direction": "higher",
+      "maleLabel": "引体向上",
+      "femaleLabel": "仰卧起坐",
+      "male": [
+        { "min": 15, "score": 100 },
+        { "min": 12, "score": 90 },
+        { "min": 9, "score": 80 },
+        { "min": 6, "score": 70 },
+        { "min": 3, "score": 60 },
+        { "min": 0, "score": 40 }
+      ],
+      "female": [
+        { "min": 50, "score": 100 },
+        { "min": 45, "score": 90 },
+        { "min": 40, "score": 80 },
+        { "min": 35, "score": 70 },
+        { "min": 30, "score": 60 },
+        { "min": 0, "score": 40 }
+      ]
+    },
+    "endurance": {
+      "label": "耐力项目",
+      "unit": "秒",
+      "direction": "lower",
+      "maleLabel": "1000米跑",
+      "femaleLabel": "800米跑",
+      "male": [
+        { "max": 210, "score": 100 },
+        { "max": 225, "score": 90 },
+        { "max": 240, "score": 80 },
+        { "max": 255, "score": 70 },
+        { "max": 270, "score": 60 },
+        { "max": 9999, "score": 40 }
+      ],
+      "female": [
+        { "max": 195, "score": 100 },
+        { "max": 210, "score": 90 },
+        { "max": 225, "score": 80 },
+        { "max": 240, "score": 70 },
+        { "max": 255, "score": 60 },
+        { "max": 9999, "score": 40 }
+      ]
+    }
+  }
+}
