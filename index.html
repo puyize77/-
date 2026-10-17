@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="初中体育成绩自动评分与统计分析系统" />
+    <title>初中体育成绩自动评分与统计分析系统</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">SPORTS SCORE DESK</p>
+          <h1>初中体育成绩自动评分与统计分析系统</h1>
+          <p class="subtitle">录入原始成绩，自动计算单项分、加权总分和等级，并按班级查看优良率、及格率与成绩分布。</p>
+        </div>
+        <div class="topbar-badge">电脑 / 手机浏览器均可使用</div>
+      </header>
+
+      <section class="notice" aria-live="polite">
+        <div aria-hidden="true">⚠️</div>
+        <div>
+          <strong id="standard-title">评分标准</strong>
+          <p id="standard-note">请在“评分设置”中确认并替换为学校、地区和年份对应的正式标准。</p>
+        </div>
+      </section>
+
+      <nav class="tabs" aria-label="功能导航">
+        <button type="button" data-tab="input" class="active">录入评分</button>
+        <button type="button" data-tab="analysis">班级分析</button>
+        <button type="button" data-tab="settings">评分设置</button>
+      </nav>
+
+      <section data-panel="input" class="active">
+        <div class="input-layout">
+          <section id="input-panel" class="card">
+            <div class="card-inner">
+              <div class="card-heading">
+                <div>
+                  <h2 id="form-title">录入一名学生</h2>
+                  <p>正常状态需要填写全部项目；缺考、免测、缺项记录会保留，但不会进入优良率和及格率分母。</p>
+                </div>
+              </div>
+              <form id="student-form">
+                <div class="identity-grid">
+                  <label class="field" for="student-name"><span>姓名</span><input id="student-name" required placeholder="例如：张三" /></label>
+                  <label class="field" for="class-name"><span>班级</span><input id="class-name" required placeholder="例如：九年级1班" /></label>
+                  <label class="field" for="grade"><span>年级</span><select id="grade"><option>初一</option><option>初二</option><option selected>初三</option></select></label>
+                  <label class="field" for="gender"><span>性别</span><select id="gender"><option value="male">男</option><option value="female">女</option></select></label>
+                  <label class="field" for="status"><span>成绩状态</span><select id="status"><option value="active">正常</option><option value="absent">缺考</option><option value="exempt">免测</option><option value="incomplete">缺项</option></select></label>
+                  <label class="field" for="bonus"><span>附加分 <small>默认 0</small></span><input id="bonus" type="number" min="0" step="0.1" value="0" placeholder="没有就填 0" /></label>
+                </div>
+
+                <div class="section-label">原始成绩</div>
+                <div id="score-fields" class="score-fields"></div>
+
+                <div class="form-actions">
+                  <button id="submit-record" class="button-primary" type="submit">计算并保存</button>
+                  <button id="reset-form" class="button-ghost" type="button">新建记录</button>
+                  <span id="form-message" class="message" aria-live="polite"></span>
+                </div>
+              </form>
+            </div>
+          </section>
+
+          <section id="result-panel" class="card result-panel hidden" aria-live="polite">
+            <div class="card-inner">
+              <div class="card-heading">
+                <div>
+                  <h2>本次计算结果</h2>
+                  <p>总分按当前评分设置的权重计算。</p>
+                </div>
+              </div>
+              <div class="result-summary">
+                <div class="result-stat"><small>加权基础分</small><strong id="result-base">—</strong></div>
+                <div class="result-stat"><small>总分</small><strong id="result-total">—</strong></div>
+                <div class="result-stat"><small>等级</small><span id="result-grade" class="grade-pill neutral">—</span></div>
+              </div>
+              <div class="table-wrap">
+                <table class="result-table">
+                  <thead><tr><th>项目</th><th>原始成绩</th><th>单项分</th><th>权重</th><th>折算分</th></tr></thead>
+                  <tbody id="result-items"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section class="card list-card">
+          <div class="card-inner">
+            <div class="card-heading">
+              <div>
+                <h2>已保存记录</h2>
+                <p>数据保存在当前浏览器；可用 CSV 导入或导出，方便班级批量整理。</p>
+              </div>
+              <span id="list-message" class="message" aria-live="polite"></span>
+            </div>
+            <div class="toolbar">
+              <input id="search-input" placeholder="搜索姓名、班级或年级" aria-label="搜索记录" />
+              <select id="filter-class" aria-label="按班级筛选"><option value="">全部班级</option></select>
+              <button id="export-csv" class="button-secondary" type="button">导出 CSV</button>
+              <label class="button-ghost" for="import-csv">导入 CSV<input id="import-csv" type="file" accept=".csv,text/csv" hidden /></label>
+              <button id="clear-records" class="button-danger" type="button">清空记录</button>
+            </div>
+            <div class="table-wrap">
+              <table class="records-table">
+                <thead><tr><th>学生</th><th>班级</th><th>性别</th><th>状态</th><th>总分</th><th>等级</th><th>操作</th></tr></thead>
+                <tbody id="records-body"></tbody>
+              </table>
+              <div id="empty-records" class="empty-state">还没有记录，先在上方录入一名学生吧。</div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section data-panel="analysis">
+        <section class="card">
+          <div class="card-inner">
+            <div class="card-heading">
+              <div>
+                <h2>班级分析</h2>
+                <p>统计只使用“正常”且项目完整的有效成绩。</p>
+              </div>
+              <select id="analysis-class" aria-label="选择分析班级"><option value="">全体</option></select>
+            </div>
+            <div class="metric-grid">
+              <div class="metric"><small>记录总数</small><strong id="metric-total">0</strong></div>
+              <div class="metric"><small>有效成绩</small><strong id="metric-valid">0</strong></div>
+              <div class="metric"><small>平均分</small><strong id="metric-average">—</strong></div>
+              <div class="metric"><small>优良率</small><strong id="metric-excellent-good">0.0%</strong></div>
+              <div class="metric"><small>及格率</small><strong id="metric-pass">0.0%</strong></div>
+            </div>
+            <div class="analysis-grid">
+              <div class="chart-card" style="border:1px solid var(--line);border-radius:16px;">
+                <h3>等级分布</h3>
+                <div id="grade-bars"></div>
+              </div>
+              <div class="chart-card" style="border:1px solid var(--line);border-radius:16px;">
+                <h3>统计口径</h3>
+                <p id="analysis-note" class="analysis-note">暂无数据。</p>
+                <div class="settings-help" style="margin-top:18px;">
+                  <strong>计算方式</strong>
+                  <ul>
+                    <li>优良率 =（优秀人数 + 良好人数）÷ 有效成绩人数。</li>
+                    <li>及格率 = 总分达到 60 分的人数 ÷ 有效成绩人数。</li>
+                    <li>等级阈值和项目权重可在“评分设置”中修改。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section data-panel="settings">
+        <section class="card">
+          <div class="card-inner">
+            <div class="card-heading">
+              <div>
+                <h2>评分设置</h2>
+                <p>请按学校、地区和年份，把正式评分表整理为 JSON 后保存。保存后会重新计算已有记录。</p>
+              </div>
+              <span id="settings-message" class="message" aria-live="polite"></span>
+            </div>
+            <div class="settings-grid">
+              <label class="field" for="standard-json"><span>当前评分标准 JSON</span><textarea id="standard-json" spellcheck="false"></textarea></label>
+              <div class="settings-help">
+                <strong>修改提示</strong>
+                <ul>
+                  <li><code>weights</code> 是各项目权重，通常合计 100。</li>
+                  <li><code>male</code> / <code>female</code> 是男生、女生评分档位。</li>
+                  <li><code>direction: higher</code> 表示数值越高越好；<code>lower</code> 表示越低越好；<code>range</code> 表示区间。</li>
+                  <li><code>gradeBands</code> 的 <code>min</code> 是等级起始分。</li>
+                  <li>当前演示表只是程序示例，不代表正式标准。</li>
+                </ul>
+                <div class="form-actions">
+                  <button id="load-demo" class="button-ghost" type="button">载入演示表</button>
+                  <button id="save-standard" class="button-primary" type="button">保存并启用</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <footer style="padding:24px 4px 0;color:var(--muted);font-size:12px;line-height:1.6;">
+        本工具用于成绩录入和统计辅助。正式使用前，请由学校或当地主管部门确认评分标准、附加分和缺考/免测统计口径。
+      </footer>
+    </main>
+    <script type="module" src="./src/app.js"></script>
+  </body>
+</html>
