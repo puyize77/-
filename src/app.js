@@ -120,7 +120,7 @@ function collectForm() {
     id: editingId || makeId(),
     name: $("#student-name").value.trim(),
     className: $("#class-name").value.trim(),
-    grade: $("#grade").value,
+    grade: $("#grade").value || "初三",
     gender: $("#gender").value,
     status: $("#status").value,
     bonus: $("#bonus").value,
