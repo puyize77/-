@@ -133,7 +133,10 @@ function calculatedRecord(form) {
   return {
     ...form,
     gradeLevel: form.gradeLevel || form.grade || "初三",
-    scores: Object.fromEntries(EVENT_ORDER.map((eventId) => [eventId, form.scores[eventId] === "" ? null : Number(form.scores[eventId])])),
+    scores: Object.fromEntries(EVENT_ORDER.map((eventId) => {
+      const value = form.scores[eventId];
+      return [eventId, value === "" || value === null || value === undefined ? null : Number(value)];
+    })),
     total: result.total,
     baseTotal: result.baseTotal,
     bonus: result.bonus,
