@@ -102,7 +102,7 @@
               <input id="search-input" placeholder="搜索姓名、班级或年级" aria-label="搜索记录" />
               <select id="filter-class" aria-label="按班级筛选"><option value="">全部班级</option></select>
               <button id="export-csv" class="button-secondary" type="button">导出 CSV</button>
-              <label class="button-ghost" for="import-csv">导入 CSV<input id="import-csv" type="file" accept=".csv,text/csv" hidden /></label>
+              <label class="button-ghost" for="import-csv">导入名单 / 成绩<input id="import-csv" type="file" accept=".xlsx,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden /></label>
               <button id="clear-records" class="button-danger" type="button">清空记录</button>
             </div>
             <div class="table-wrap">
@@ -128,9 +128,9 @@
             </div>
 
             <div class="roster-actions">
-              <label class="button-secondary" for="roster-file">导入测试名单 CSV<input id="roster-file" type="file" accept=".csv,text/csv" hidden /></label>
+              <label class="button-secondary" for="roster-file">导入 Excel / CSV 名单<input id="roster-file" type="file" accept=".xlsx,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden /></label>
               <button id="download-roster-template" class="button-ghost" type="button">下载名单模板</button>
-              <span class="helper-text">表头至少包含：姓名、班级；可选：年级、性别、状态、序号。</span>
+              <span class="helper-text">支持 .xlsx 多工作表和 CSV，一次导入全部班级；表头至少包含：姓名、班级。按工作表和行的原顺序测试，重复导入会保留已录成绩。</span>
             </div>
 
             <div class="project-toolbar">
@@ -283,6 +283,6 @@
         本工具用于成绩录入和统计辅助。正式使用前，请由学校或当地主管部门确认评分标准、附加分和缺考/免测统计口径。
       </footer>
     </main>
-    <script type="module" src="./src/app.js?v=20261017-9"></script>
+    <script type="module" src="./src/app.js?v=20261018-1"></script>
   </body>
 </html>
