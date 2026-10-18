@@ -23,6 +23,18 @@ const statusLabels = {
   incomplete: "缺项",
 };
 
+function statusFromText(value, fallback = "pending") {
+  const text = String(value || "").trim().toLowerCase();
+  const aliases = {
+    pending: "pending", "待测试": "pending",
+    active: "active", "正常": "active",
+    absent: "absent", "缺考": "absent",
+    exempt: "exempt", "免测": "exempt",
+    incomplete: "incomplete", "缺项": "incomplete", "未完成": "incomplete",
+  };
+  return aliases[text] || fallback;
+}
+
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
