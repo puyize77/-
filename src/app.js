@@ -8,7 +8,7 @@ import {
   formatRate,
   summarizeStudents,
 } from "./score-engine.js";
-import { readRosterFile, studentsFromSheets, mergeRosterRecords, rosterTemplateCsv } from "./roster-import.js?v=20261018-1";
+import { readRosterFile, studentsFromSheets, mergeRosterRecords, rosterTemplateCsv } from "./roster-import.js?v=20261018-4";
 
 const STORAGE_KEYS = {
   records: "sports-score-records-v1",
@@ -717,7 +717,7 @@ async function rosterImportListFile(file) {
   const parsed = studentsFromSheets(await readRosterFile(file));
   const normalizeHeader = (value) => String(value || "").replace(/\s+/g, "").toLowerCase();
   for (const student of parsed.students) {
-    const get = (...labels) => labels.map((label) => student.fields[normalizeHeader(label)]).find((value) => value !== undefined && value !== "");
+    const get = (...labels) => labels.filter(Boolean).map((label) => student.fields[normalizeHeader(label)]).find((value) => value !== undefined && value !== "");
     student.status = statusFromText(student.statusText, "pending");
     student.scores = {};
     for (const eventId of EVENT_ORDER) {
