@@ -8,6 +8,7 @@ import {
   formatRate,
   summarizeStudents,
 } from "./score-engine.js";
+import { readRosterFile, studentsFromSheets, mergeRosterRecords, rosterTemplateCsv } from "./roster-import.js?v=20261018-1";
 
 const STORAGE_KEYS = {
   records: "sports-score-records-v1",
@@ -421,20 +422,7 @@ function bindEvents() {
   $("#analysis-class").addEventListener("change", renderAnalysis);
   $("#export-csv").addEventListener("click", exportCsv);
   $("#import-csv").addEventListener("change", async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    try {
-      const imported = importCsvText(await file.text());
-      records = [...imported, ...records];
-      saveRecords();
-      renderRecords();
-      renderAnalysis();
-      showMessage("#list-message", `已导入 ${imported.length} 条记录。`, "success");
-    } catch (error) {
-      showMessage("#list-message", error.message, "error");
-    } finally {
-      event.target.value = "";
-    }
+    await rosterHandleFileInput(event, "#list-message");
   });
   $("#clear-records").addEventListener("click", () => {
     if (!records.length || !window.confirm("确定清空当前浏览器保存的全部记录吗？")) return;
@@ -710,50 +698,56 @@ function rosterApplyProjectStatus() {
 }
 
 function rosterDownloadTemplate() {
-  const csv = "\\ufeff序号,姓名,班级,年级,性别,状态\\n1,张三,九年级1班,初三,男,待测试\\n2,李四,九年级1班,初三,女,待测试\\n3,王五,九年级2班,初三,男,待测试\\n";
-  downloadFile("体测名单模板.csv", csv, "text/csv;charset=utf-8");
+  downloadFile("体测名单模板.csv", rosterTemplateCsv(), "text/csv;charset=utf-8");
 }
 
-function rosterImportListText(text) {
-  const rows = parseCsv(text.replace(/^\\ufeff/, ""));
-  if (rows.length < 2) throw new Error("名单 CSV 至少需要一行表头和一行数据。");
-  const headers = rows[0].map((header) => header.trim());
-  const indexes = {
-    order: headerIndex(headers, "序号", "编号", "order"),
-    name: headerIndex(headers, "姓名", "name"),
-    className: headerIndex(headers, "班级", "className", "class"),
-    grade: headerIndex(headers, "年级", "grade"),
-    gender: headerIndex(headers, "性别", "gender"),
-    status: headerIndex(headers, "状态", "status"),
-  };
-  if (indexes.name < 0 || indexes.className < 0) throw new Error("名单 CSV 必须包含“姓名”和“班级”两列。");
-  let added = 0;
-  let updated = 0;
-  const orderBase = records.reduce((max, record) => Math.max(max, Number(record.rosterOrder) || 0), 0) + 1;
-  rows.slice(1).forEach((row, rowIndex) => {
-    const name = cellAt(row, indexes.name);
-    const className = cellAt(row, indexes.className);
-    if (!name || !className) return;
-    const grade = cellAt(row, indexes.grade) || "初三";
-    const gender = ["女", "female", "女生"].includes(cellAt(row, indexes.gender)) ? "female" : "male";
-    const importedStatus = statusFromText(cellAt(row, indexes.status), "pending");
-    const existing = records.find((record) => record.name === name && record.className === className && (record.gradeLevel || record.grade) === grade);
-    if (existing) {
-      existing.gender = gender;
-      if (importedStatus === "absent" || importedStatus === "exempt") existing.status = importedStatus;
-      updated += 1;
-      return;
+async function rosterImportListFile(file) {
+  const parsed = studentsFromSheets(await readRosterFile(file));
+  const normalizeHeader = (value) => String(value || "").replace(/\s+/g, "").toLowerCase();
+  for (const student of parsed.students) {
+    const get = (...labels) => labels.map((label) => student.fields[normalizeHeader(label)]).find((value) => value !== undefined && value !== "");
+    student.status = statusFromText(student.statusText, "pending");
+    student.scores = {};
+    for (const eventId of EVENT_ORDER) {
+      const definition = standard.events?.[eventId] || {};
+      const raw = get(eventId, definition.label, definition.maleLabel, definition.femaleLabel, EVENT_META[eventId].label);
+      if (raw === undefined) continue;
+      if (!Number.isFinite(Number(raw))) throw new Error(student.name + " 的“" + EVENT_META[eventId].label + "”不是数字，请修正后导入。");
+      student.scores[eventId] = Number(raw);
     }
-    records.push({
-      id: makeId(), name, className, gradeLevel: grade, gender,
-      status: importedStatus === "absent" || importedStatus === "exempt" ? importedStatus : "pending",
-      bonus: 0, rosterOrder: Number(cellAt(row, indexes.order)) || orderBase + rowIndex,
-      scores: Object.fromEntries(EVENT_ORDER.map((eventId) => [eventId, null])),
-    });
-    added += 1;
-  });
+    const bonus = get("附加分", "bonus");
+    if (bonus !== undefined) {
+      if (!Number.isFinite(Number(bonus))) throw new Error(student.name + " 的附加分不是数字。");
+      student.bonus = Number(bonus);
+    }
+  }
+  const merged = mergeRosterRecords(records, parsed.students, { makeId, eventIds: EVENT_ORDER });
+  records = merged.records;
   rosterNormalizeRecords();
-  return { added, updated };
+  return { ...parsed, added: merged.added, updated: merged.updated };
+}
+
+async function rosterHandleFileInput(event, messageSelector) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  showMessage(messageSelector, "正在读取名单，请稍候…", "info");
+  try {
+    const result = await rosterImportListFile(file);
+    rosterRenderProject();
+    rosterRenderFinal();
+    renderRecords();
+    renderAnalysis();
+    const details = ["读取 " + result.usedSheets.length + " 个工作表", "新增 " + result.added + " 人", "更新 " + result.updated + " 人（保留已录成绩）"];
+    if (result.skippedSheets.length) details.push("跳过 " + result.skippedSheets.length + " 个空表或无名单表");
+    if (result.skippedRows) details.push("跳过 " + result.skippedRows + " 行缺少姓名或班级的数据");
+    if (result.missingGender) details.push(result.missingGender + " 人未填写性别，暂按男生，请核对");
+    showMessage(messageSelector, "导入成功：" + details.join("，") + "。", "success");
+    if (event.target.id === "roster-file") switchTab("project");
+  } catch (error) {
+    showMessage(messageSelector, "导入失败：" + error.message, "error");
+  } finally {
+    event.target.value = "";
+  }
 }
 
 function rosterBindEvents() {
@@ -762,21 +756,7 @@ function rosterBindEvents() {
     if (button.dataset.tab === "final") rosterRenderFinal();
   }));
   $("#roster-file").addEventListener("change", async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    try {
-      const result = rosterImportListText(await file.text());
-      rosterRenderProject();
-      rosterRenderFinal();
-      renderRecords();
-      renderAnalysis();
-      showMessage("#roster-message", "名单已导入：新增 " + result.added + " 人，更新 " + result.updated + " 人。", "success");
-      switchTab("project");
-    } catch (error) {
-      showMessage("#roster-message", error.message, "error");
-    } finally {
-      event.target.value = "";
-    }
+    await rosterHandleFileInput(event, "#roster-message");
   });
   $("#download-roster-template").addEventListener("click", rosterDownloadTemplate);
   $("#project-select").addEventListener("change", rosterRenderProject);
