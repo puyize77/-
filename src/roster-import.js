@@ -166,7 +166,7 @@ export function studentsFromSheets(sheets) {
       const genderText = get(row, "gender").toLowerCase();
       if (genderText && !["男", "男生", "male", "m", "女", "女生", "female", "f"].includes(genderText)) throw new Error("工作表“" + sheet.name + "”中“" + name + "”的性别无法识别，请填写“男”或“女”。");
       if (!genderText) missingGender += 1;
-      students.push({ name, className, gradeLevel: get(row, "gradeLevel") || "初三", gender: ["女", "女生", "female", "f"].includes(genderText) ? "female" : "male", sourceOrder: get(row, "order"), statusText: get(row, "status"), fields: Object.fromEntries(headers.map((header, index) => [header, clean(row[index])])) });
+      students.push({ name, className, gradeLevel: get(row, "gradeLevel") || "初三", gender: ["女", "女生", "female", "f"].includes(genderText) ? "female" : "male", sourceOrder: get(row, "order"), statusText: get(row, "status"), fields: Object.fromEntries(headers.map((header, index) => [header, clean(row[index])]).filter(([header]) => header)) });
       sheetCount += 1;
     }
     if (sheetCount) usedSheets.push(sheet.name);
