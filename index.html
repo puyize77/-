@@ -50,6 +50,8 @@
                   <label class="field" for="class-name"><span>班级</span><input id="class-name" required placeholder="例如：九年级1班" /></label>
                   <label class="field" for="grade"><span>年级</span><select id="grade"><option>初一</option><option>初二</option><option selected>初三</option></select></label>
                   <label class="field" for="gender"><span>性别</span><select id="gender"><option value="male">男</option><option value="female">女</option></select></label>
+                  <label class="field" for="height"><span>身高 <small>厘米</small></span><input id="height" type="number" min="1" step="0.1" placeholder="例如：170" /></label>
+                  <label class="field" for="weight"><span>体重 <small>公斤</small></span><input id="weight" type="number" min="1" step="0.1" placeholder="例如：60" /></label>
                   <label class="field" for="status"><span>成绩状态</span><select id="status"><option value="pending">待测试</option><option value="active">正常</option><option value="absent">缺考</option><option value="exempt">免测</option><option value="incomplete">缺项</option></select></label>
                   <label class="field" for="bonus"><span>附加分 <small>默认 0</small></span><input id="bonus" type="number" min="0" step="0.1" value="0" placeholder="没有就填 0" /></label>
                 </div>
@@ -131,7 +133,7 @@
             <div class="roster-actions">
               <label class="button-secondary" for="roster-file">导入 Excel / CSV 名单<input id="roster-file" type="file" accept=".xlsx,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden /></label>
               <button id="download-roster-template" class="button-ghost" type="button">下载名单模板</button>
-              <span class="helper-text">支持 .xlsx 多工作表和 CSV，一次导入全部班级；表头至少包含：姓名、班级。按工作表和行的原顺序测试，重复导入会保留已录成绩。</span>
+              <span class="helper-text">支持 .xlsx 多工作表和 CSV，一次导入全部班级；表头至少包含：姓名、班级。选择 BMI 项目后输入身高和体重，系统按中考身高体重表计算 BMI 和标准分。</span>
             </div>
 
             <div class="project-toolbar">
@@ -154,6 +156,11 @@
                 <p id="project-student-meta" class="muted-line">导入名单后，系统会按照名单顺序准备测试对象。</p>
                 <label class="field" for="project-student-select"><span>选择当前学生</span><select id="project-student-select"><option value="">暂无学生</option></select></label>
                 <label class="field project-score-input" for="project-score-input"><span id="project-score-label">成绩</span><input id="project-score-input" type="number" inputmode="decimal" step="0.1" disabled placeholder="选择学生后输入" /></label>
+                <div id="project-bmi-inputs" class="project-bmi-inputs hidden">
+                  <label class="field" for="project-height-input"><span>身高 <small>厘米</small></span><input id="project-height-input" type="number" min="1" step="0.1" placeholder="例如：170" disabled /></label>
+                  <label class="field" for="project-weight-input"><span>体重 <small>公斤</small></span><input id="project-weight-input" type="number" min="1" step="0.1" placeholder="例如：60" disabled /></label>
+                  <p id="project-bmi-preview" class="auto-save-note">输入身高和体重后，系统会计算 BMI 和身高体重标准分。</p>
+                </div>
                 <label class="field" for="project-status"><span>当前状态</span><select id="project-status" disabled><option value="pending">待测试</option><option value="active">正常</option><option value="incomplete">未完成</option><option value="absent">缺考</option><option value="exempt">免测</option></select></label>
                 <p id="project-auto-save" class="auto-save-note">输入成绩后会自动保存到当前浏览器。</p>
                 <div class="form-actions">
@@ -175,7 +182,7 @@
                     <thead><tr><th>顺序</th><th>学生</th><th>班级</th><th>本项目成绩</th><th>状态</th><th>操作</th></tr></thead>
                     <tbody id="project-student-body"></tbody>
                   </table>
-                  <div id="project-empty" class="empty-state">还没有名单，请先导入 CSV。</div>
+                  <div id="project-empty" class="empty-state">还没有名单，请先导入 Excel 或 CSV。</div>
                 </div>
               </section>
             </div>
@@ -202,7 +209,7 @@
             <p class="final-note">成绩表会随着分项目测试自动更新。可以导出 Excel（.xlsx）或 CSV 文件，用 Excel、WPS 打开和打印。</p>
             <div class="table-wrap">
               <table class="records-table final-table">
-                <thead><tr><th>顺序</th><th>姓名</th><th>班级</th><th>性别</th><th>状态</th><th>BMI</th><th>肺活量</th><th>50米</th><th>体前屈</th><th>跳远</th><th>力量</th><th>耐力</th><th>总分</th><th>等级</th></tr></thead>
+                <thead><tr><th>顺序</th><th>姓名</th><th>班级</th><th>性别</th><th>状态</th><th>身高</th><th>体重</th><th>BMI值</th><th>BMI分</th><th>肺活量</th><th>50米</th><th>体前屈</th><th>跳远</th><th>力量</th><th>耐力</th><th>总分</th><th>等级</th></tr></thead>
                 <tbody id="final-table-body"></tbody>
               </table>
               <div id="final-empty" class="empty-state">导入名单或录入成绩后，这里会生成成绩表。</div>
@@ -285,6 +292,6 @@
         本工具用于成绩录入和统计辅助。正式使用前，请由学校或当地主管部门确认评分标准、附加分和缺考/免测统计口径。
       </footer>
     </main>
-    <script type="module" src="./src/app.js?v=20261019-2"></script>
+    <script type="module" src="./src/app.js?v=20261019-3"></script>
   </body>
 </html>
