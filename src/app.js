@@ -7,7 +7,8 @@ import {
   formatNumber,
   formatRate,
   summarizeStudents,
-} from "./score-engine.js";
+} from "./score-engine.js?v=20261019-1";
+import { calculateHeightWeight } from "./bmi-standard.js?v=20261019-1";
 import { readRosterFile, studentsFromSheets, mergeRosterRecords, rosterTemplateCsv } from "./roster-import.js?v=20261018-4";
 
 const STORAGE_KEYS = {
@@ -103,7 +104,7 @@ function displayUnit(eventId) {
 }
 
 function inputHint(eventId) {
-  if (eventId === "bmi") return "可直接填 BMI；留空时不能计算。";
+  if (eventId === "bmi") return "输入身高和体重后，按中考身高体重表自动计算 BMI 和分数。";
   if (eventId === "endurance") return "统一填秒，例如 4分20秒填 260。";
   if (eventId === "sprint50") return "例如 8.2。";
   return "请输入实测原始成绩。";
@@ -115,13 +116,23 @@ function renderScoreFields() {
     const label = displayEventLabel(eventId, gender);
     const meta = EVENT_META[eventId];
     const value = editingId ? (records.find((record) => record.id === editingId)?.scores?.[eventId] ?? "") : "";
+    const bmiField = eventId === "bmi";
     return `
       <label class="field score-field" for="score-${eventId}">
         <span>${label}<small>${displayUnit(eventId) || ""}</small></span>
-        <input id="score-${eventId}" name="${eventId}" type="number" inputmode="${meta.inputMode}" step="${eventId === "sprint50" || eventId === "sitReach" || eventId === "bmi" ? "0.1" : "1"}" min="0" value="${value}" placeholder="原始成绩" />
+        <input id="score-${eventId}" name="${eventId}" type="number" inputmode="${meta.inputMode}" step="${eventId === "sprint50" || eventId === "sitReach" || eventId === "bmi" ? "0.1" : "1"}" min="0" value="${value}" placeholder="${bmiField ? "由身高和体重自动计算" : "原始成绩"}" ${bmiField ? "readonly" : ""} />
         <em>${inputHint(eventId)}</em>
       </label>`;
   }).join("");
+  updateBmiPreview();
+}
+
+function updateBmiPreview() {
+  const bmiInput = $("#score-bmi");
+  if (!bmiInput) return;
+  const info = calculateHeightWeight({ height: $("#height")?.value, weight: $("#weight")?.value, gender: $("#gender")?.value });
+  bmiInput.value = info?.bmi ?? "";
+  bmiInput.title = info?.score === null || info?.score === undefined ? (info?.outOfRange ? `身高超出标准表范围（${info.minHeight}-${info.maxHeight}厘米）` : "") : `${info.category}，${info.score}分`;
 }
 
 function collectForm() {
@@ -135,6 +146,8 @@ function collectForm() {
     className: $("#class-name").value.trim(),
     gradeLevel: $("#grade").value || "初三",
     gender: $("#gender").value,
+    height: $("#height").value,
+    weight: $("#weight").value,
     status: $("#status").value,
     bonus: $("#bonus").value,
     scores,
@@ -142,23 +155,29 @@ function collectForm() {
 }
 
 function calculatedRecord(form) {
-  const result = calculateStudent(form);
+  const height = form.height === "" || form.height === null || form.height === undefined ? null : Number(form.height);
+  const weight = form.weight === "" || form.weight === null || form.weight === undefined ? null : Number(form.weight);
+  const normalizedScores = Object.fromEntries(EVENT_ORDER.map((eventId) => {
+    const value = form.scores[eventId];
+    return [eventId, value === "" || value === null || value === undefined ? null : Number(value)];
+  }));
+  const result = calculateStudent({ ...form, scores: normalizedScores, height, weight });
   const existing = records.find((record) => record.id === form.id);
   const rosterOrder = form.rosterOrder ?? existing?.rosterOrder ?? rosterNextOrder();
   return {
     ...form,
     gradeLevel: form.gradeLevel || form.grade || "初三",
+    height: Number.isFinite(height) ? height : null,
+    weight: Number.isFinite(weight) ? weight : null,
     rosterOrder,
-    scores: Object.fromEntries(EVENT_ORDER.map((eventId) => {
-      const value = form.scores[eventId];
-      return [eventId, value === "" || value === null || value === undefined ? null : Number(value)];
-    })),
+    scores: Object.fromEntries(EVENT_ORDER.map((eventId) => [eventId, eventId === "bmi" && result.bmiInfo ? result.bmiInfo.bmi : normalizedScores[eventId]])),
     total: result.total,
     baseTotal: result.baseTotal,
     bonus: result.bonus,
     grade: result.grade,
     gradeTone: result.gradeTone,
     itemResults: result.itemResults,
+    bmiInfo: result.bmiInfo,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -167,6 +186,9 @@ function validateForm(form) {
   if (!form.name) return "请填写姓名。";
   if (!form.className) return "请填写班级。";
   if (form.status !== "active") return "";
+  const bmiInfo = calculateHeightWeight({ height: form.height, weight: form.weight, gender: form.gender });
+  if (!bmiInfo) return "正常状态需要填写身高和体重，系统才能计算 BMI 成绩。";
+  if (bmiInfo.outOfRange) return `身高超出当前标准表范围（${bmiInfo.minHeight}-${bmiInfo.maxHeight} 厘米），请按标准表处理。`;
   const missing = EVENT_ORDER.filter((eventId) => form.scores[eventId] === "" || form.scores[eventId] === null);
   return missing.length ? `正常状态还缺少：${missing.map((id) => displayEventLabel(id, form.gender)).join("、")}。` : "";
 }
@@ -182,7 +204,7 @@ function renderResult(record) {
   $("#result-items").innerHTML = result.itemResults.map((item) => `
     <tr>
       <td>${item.label}</td>
-      <td>${formatNumber(item.raw)} ${item.unit || ""}</td>
+      <td>${formatNumber(item.raw)} ${item.unit || ""}${item.category ? ` · ${item.category}` : ""}</td>
       <td>${item.points === null ? "—" : item.points}</td>
       <td>${item.weight}%</td>
       <td>${item.weighted === null ? "—" : formatNumber(item.weighted)}</td>
@@ -194,6 +216,8 @@ function resetForm() {
   $("#student-form").reset();
   $("#status").value = "active";
   $("#gender").value = "male";
+  $("#height").value = "";
+  $("#weight").value = "";
   $("#form-title").textContent = "录入一名学生";
   $("#submit-record").textContent = "计算并保存";
   renderScoreFields();
@@ -209,6 +233,8 @@ function fillForm(record) {
   $("#class-name").value = record.className || "";
   $("#grade").value = record.gradeLevel || "初三";
   $("#gender").value = record.gender || "male";
+  $("#height").value = record.height ?? "";
+  $("#weight").value = record.weight ?? "";
   $("#status").value = record.status || "active";
   $("#bonus").value = record.bonus || 0;
   renderScoreFields();
@@ -291,7 +317,7 @@ function escapeCsv(value) {
 }
 
 function exportTableData() {
-  const headers = ["序号", "姓名", "班级", "年级", "性别", "状态", "BMI", "肺活量", "50米跑", "坐位体前屈", "立定跳远", "力量项目", "耐力项目", "附加分", "总分", "等级"];
+  const headers = ["序号", "姓名", "班级", "年级", "性别", "状态", "身高（厘米）", "体重（公斤）", "BMI值", "BMI分", "BMI分类", "肺活量", "50米跑", "坐位体前屈", "立定跳远", "力量项目", "耐力项目", "附加分", "总分", "等级"];
   const ordered = [...records].sort((a, b) => (Number(a.rosterOrder) || 0) - (Number(b.rosterOrder) || 0));
   const rows = ordered.map((record, index) => [
     Number(record.rosterOrder) || index + 1,
@@ -300,7 +326,12 @@ function exportTableData() {
     record.gradeLevel || "初三",
     record.gender === "female" ? "女" : "男",
     statusLabels[record.status] || record.status,
-    ...EVENT_ORDER.map((eventId) => record.scores?.[eventId] ?? ""),
+    record.height ?? "",
+    record.weight ?? "",
+    record.scores?.bmi ?? "",
+    record.itemResults?.find((item) => item.eventId === "bmi")?.points ?? "",
+    record.bmiInfo?.category ?? "",
+    ...EVENT_ORDER.filter((eventId) => eventId !== "bmi").map((eventId) => record.scores?.[eventId] ?? ""),
     record.bonus ?? 0,
     record.total ?? "",
     record.grade ?? "",
@@ -478,9 +509,15 @@ function importCsvText(text) {
     className: findIndex("班级", "className", "class"),
     grade: findIndex("年级", "grade"),
     gender: findIndex("性别", "gender"),
+    height: findIndex("身高", "身高（厘米）", "height"),
+    weight: findIndex("体重", "体重（公斤）", "weight"),
     status: findIndex("状态", "status"),
     bonus: findIndex("附加分", "bonus"),
-    ...Object.fromEntries(EVENT_ORDER.map((eventId) => [eventId, findIndex(standard.events?.[eventId]?.label || EVENT_META[eventId].label, eventId)])),
+    ...Object.fromEntries(EVENT_ORDER.map((eventId) => {
+      const aliases = [standard.events?.[eventId]?.label || EVENT_META[eventId].label, eventId];
+      if (eventId === "bmi") aliases.push("BMI值");
+      return [eventId, findIndex(...aliases)];
+    })),
   };
   if (indexes.name < 0 || indexes.className < 0) throw new Error("CSV 必须包含“姓名”和“班级”列。");
   return rows.slice(1).map((row) => {
@@ -490,7 +527,7 @@ function importCsvText(text) {
     const gender = ["女", "female", "女生"].includes(genderText) ? "female" : "male";
     const status = Object.entries(statusLabels).find(([, label]) => label === statusText)?.[0] || (Object.keys(statusLabels).includes(statusText) ? statusText : "active");
     const scores = Object.fromEntries(EVENT_ORDER.map((eventId) => [eventId, cellAt(eventId) === "" ? null : Number(cellAt(eventId))]));
-    const raw = { id: makeId(), name: cellAt("name"), className: cellAt("className"), gradeLevel: cellAt("grade") || "初三", gender, status, bonus: cellAt("bonus") || 0, scores };
+    const raw = { id: makeId(), name: cellAt("name"), className: cellAt("className"), gradeLevel: cellAt("grade") || "初三", gender, height: cellAt("height"), weight: cellAt("weight"), status, bonus: cellAt("bonus") || 0, scores };
     return calculatedRecord(raw);
   }).filter((record) => record.name);
 }
@@ -514,6 +551,8 @@ function switchTab(tabName) {
 function bindEvents() {
   $$("[data-tab]").forEach((button) => button.addEventListener("click", () => switchTab(button.dataset.tab)));
   $("#gender").addEventListener("change", renderScoreFields);
+  $("#height").addEventListener("input", updateBmiPreview);
+  $("#weight").addEventListener("input", updateBmiPreview);
   $("#reset-form").addEventListener("click", resetForm);
   $("#student-form").addEventListener("submit", (event) => {
     event.preventDefault();
@@ -624,6 +663,11 @@ function rosterNextOrder() {
 }
 
 function rosterHasScore(record, eventId) {
+  if (eventId === "bmi") {
+    if (record.bmiInfo) return record.bmiInfo.score !== null && record.bmiInfo.score !== undefined;
+    const legacyValue = record.scores?.bmi;
+    return legacyValue !== null && legacyValue !== undefined && legacyValue !== "" && Number.isFinite(Number(legacyValue));
+  }
   const value = record.scores?.[eventId];
   return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
 }
@@ -655,6 +699,8 @@ function rosterNormalizeRecords() {
       className: String(record.className || "").trim(),
       gradeLevel: record.gradeLevel || record.grade || "初三",
       gender: record.gender === "female" ? "female" : "male",
+      height: Number.isFinite(Number(record.height)) && Number(record.height) > 0 ? Number(record.height) : null,
+      weight: Number.isFinite(Number(record.weight)) && Number(record.weight) > 0 ? Number(record.weight) : null,
       status: statusLabels[record.status] ? record.status : "pending",
       bonus: Number(record.bonus) || 0,
       rosterOrder: Number.isFinite(Number(record.rosterOrder)) ? Number(record.rosterOrder) : index + 1,
@@ -664,8 +710,9 @@ function rosterNormalizeRecords() {
       })),
     };
     normalized.status = rosterDerivedStatus(normalized);
-    const result = calculateStudent({ scores: normalized.scores, standard, gender: normalized.gender, status: normalized.status, bonus: normalized.bonus });
-    return { ...normalized, grade: result.grade, total: result.total, baseTotal: result.baseTotal, bonus: result.bonus, gradeTone: result.gradeTone, itemResults: result.itemResults, updatedAt: record.updatedAt || new Date().toISOString() };
+    const result = calculateStudent({ scores: normalized.scores, standard, gender: normalized.gender, height: normalized.height, weight: normalized.weight, status: normalized.status, bonus: normalized.bonus });
+    if (result.bmiInfo) normalized.scores.bmi = result.bmiInfo.bmi;
+    return { ...normalized, bmiInfo: result.bmiInfo, grade: result.grade, total: result.total, baseTotal: result.baseTotal, bonus: result.bonus, gradeTone: result.gradeTone, itemResults: result.itemResults, updatedAt: record.updatedAt || new Date().toISOString() };
   });
   saveRecords();
 }
@@ -732,10 +779,30 @@ function rosterRenderProjectCurrent(rows) {
     ? current.className + " · " + (current.gradeLevel || "初三") + " · " + (current.gender === "female" ? "女" : "男") + " · 已完成 " + rosterCompletion(current) + "/" + EVENT_ORDER.length + " 项 · 名单顺序 " + (index + 1)
     : "导入名单后，系统会按照名单顺序准备测试对象。";
   const scoreInput = $("#project-score-input");
+  const scoreField = $(".project-score-input");
+  const bmiInputs = $("#project-bmi-inputs");
+  const heightInput = $("#project-height-input");
+  const weightInput = $("#project-weight-input");
+  const bmiPreview = $("#project-bmi-preview");
   const statusSelect = $("#project-status");
+  const bmiMode = eventId === "bmi";
+  scoreField.classList.toggle("hidden", bmiMode);
+  bmiInputs.classList.toggle("hidden", !bmiMode);
   scoreInput.disabled = !current;
+  heightInput.disabled = !current || !bmiMode;
+  weightInput.disabled = !current || !bmiMode;
   statusSelect.disabled = !current;
   scoreInput.value = current?.scores?.[eventId] ?? "";
+  heightInput.value = current?.height ?? "";
+  weightInput.value = current?.weight ?? "";
+  const bmiInfo = current ? calculateHeightWeight({ height: current.height, weight: current.weight, gender: current.gender }) : null;
+  bmiPreview.textContent = !current
+    ? "输入身高和体重后，系统会计算 BMI 和身高体重标准分。"
+    : bmiInfo?.outOfRange
+      ? `身高超出标准表范围（${bmiInfo.minHeight}-${bmiInfo.maxHeight} 厘米）。`
+      : bmiInfo
+        ? `BMI ${formatNumber(bmiInfo.bmi)}，${bmiInfo.category}，身高体重标准分 ${bmiInfo.score} 分。`
+        : "输入身高和体重后，系统会计算 BMI 和身高体重标准分。";
   scoreInput.step = eventId === "bmi" || eventId === "sprint50" || eventId === "sitReach" ? "0.1" : "1";
   scoreInput.placeholder = current ? "输入" + rosterEventLabel(eventId, current.gender) + "原始成绩" : "选择学生后输入";
   $("#project-score-label").innerHTML = (current ? rosterEventLabel(eventId, current.gender) : "成绩") + "<small>" + (displayUnit(eventId) || "") + "</small>";
@@ -779,7 +846,14 @@ function rosterRenderFinal() {
     return searchMatch && (!classFilter || record.className === classFilter);
   });
   $("#final-table-body").innerHTML = rows.map((record, index) => {
-    const scoreCells = EVENT_ORDER.map((eventId) => '<td>' + (record.scores?.[eventId] === null || record.scores?.[eventId] === undefined ? "—" : formatNumber(record.scores[eventId])) + "</td>").join("");
+    const bmiResult = record.itemResults?.find((item) => item.eventId === "bmi");
+    const scoreCells = [
+      '<td>' + (record.height === null || record.height === undefined ? "—" : formatNumber(record.height)) + "</td>",
+      '<td>' + (record.weight === null || record.weight === undefined ? "—" : formatNumber(record.weight)) + "</td>",
+      '<td>' + (record.scores?.bmi === null || record.scores?.bmi === undefined ? "—" : formatNumber(record.scores.bmi)) + "</td>",
+      '<td>' + (bmiResult?.points === null || bmiResult?.points === undefined ? "—" : bmiResult.points + "分") + "</td>",
+      ...EVENT_ORDER.filter((eventId) => eventId !== "bmi").map((eventId) => '<td>' + (record.scores?.[eventId] === null || record.scores?.[eventId] === undefined ? "—" : formatNumber(record.scores[eventId])) + "</td>"),
+    ].join("");
     return "<tr><td>" + (index + 1) + "</td><td><strong>" + escapeHtml(record.name) + "</strong><small>" + escapeHtml(record.gradeLevel || "初三") + "</small></td><td>" + escapeHtml(record.className) + "</td><td>" + (record.gender === "female" ? "女" : "男") + "</td><td><span class=\"status-chip " + record.status + "\">" + (statusLabels[record.status] || record.status) + "</span></td>" + scoreCells + "<td>" + (record.total === null || record.total === undefined ? "—" : formatNumber(record.total)) + "</td><td><span class=\"grade-pill " + (record.gradeTone || "neutral") + "\">" + (record.grade || "—") + "</span></td></tr>";
   }).join("");
   $("#final-empty").classList.toggle("hidden", rows.length > 0);
@@ -796,19 +870,38 @@ function rosterRefreshAfterChange() {
 function rosterSaveProjectScore(show = false) {
   const current = rosterCurrentRecord();
   if (!current) return false;
+  const eventId = rosterProjectEvent();
   const input = $("#project-score-input");
+  if (eventId === "bmi") {
+    const heightRaw = $("#project-height-input").value.trim();
+    const weightRaw = $("#project-weight-input").value.trim();
+    if ((heightRaw !== "" && !Number.isFinite(Number(heightRaw))) || (weightRaw !== "" && !Number.isFinite(Number(weightRaw)))) {
+      showMessage("#roster-message", "身高和体重必须填写有效数字。", "error");
+      return false;
+    }
+    current.height = heightRaw === "" ? null : Number(heightRaw);
+    current.weight = weightRaw === "" ? null : Number(weightRaw);
+    current.scores.bmi = null;
+  }
   const raw = input.value.trim();
-  if (raw !== "" && !Number.isFinite(Number(raw))) {
+  if (eventId !== "bmi" && raw !== "" && !Number.isFinite(Number(raw))) {
     showMessage("#roster-message", "请输入有效的数字成绩。", "error");
     return false;
   }
-  current.scores[rosterProjectEvent()] = raw === "" ? null : Number(raw);
+  if (eventId !== "bmi") current.scores[eventId] = raw === "" ? null : Number(raw);
+  if (current.status !== "absent" && current.status !== "exempt" && eventId !== "bmi") current.status = rosterDerivedStatus(current);
+  const previewResult = calculateStudent({ scores: current.scores, standard, gender: current.gender, height: current.height, weight: current.weight, status: current.status, bonus: current.bonus });
+  if (previewResult.bmiInfo) current.scores.bmi = previewResult.bmiInfo.bmi;
   if (current.status !== "absent" && current.status !== "exempt") current.status = rosterDerivedStatus(current);
-  const result = calculateStudent({ scores: current.scores, standard, gender: current.gender, status: current.status, bonus: current.bonus });
-  Object.assign(current, { total: result.total, baseTotal: result.baseTotal, bonus: result.bonus, grade: result.grade, gradeTone: result.gradeTone, itemResults: result.itemResults, updatedAt: new Date().toISOString() });
+  const result = calculateStudent({ scores: current.scores, standard, gender: current.gender, height: current.height, weight: current.weight, status: current.status, bonus: current.bonus });
+  Object.assign(current, { bmiInfo: result.bmiInfo, total: result.total, baseTotal: result.baseTotal, bonus: result.bonus, grade: result.grade, gradeTone: result.gradeTone, itemResults: result.itemResults, updatedAt: new Date().toISOString() });
   saveRecords();
   rosterRefreshAfterChange();
-  $("#project-auto-save").textContent = "已自动保存：" + current.name + "的" + rosterEventLabel(rosterProjectEvent(), current.gender) + "成绩。";
+  $("#project-auto-save").textContent = eventId === "bmi" && result.bmiInfo
+    ? result.bmiInfo.outOfRange
+      ? "已保存 BMI 值 " + formatNumber(result.bmiInfo.bmi) + "，但身高超出标准表范围，暂未给分。"
+      : "已自动保存：" + current.name + "的 BMI 为 " + formatNumber(result.bmiInfo.bmi) + "，身高体重标准分 " + result.bmiInfo.score + " 分。"
+    : "已自动保存：" + current.name + "的" + rosterEventLabel(eventId, current.gender) + "成绩。";
   if (show) showMessage("#roster-message", current.name + " 的成绩已保存。", "success");
   return true;
 }
@@ -831,8 +924,9 @@ function rosterApplyProjectStatus() {
   if (!current) return;
   current.status = $("#project-status").value;
   if (["pending", "active", "incomplete"].includes(current.status)) current.status = rosterDerivedStatus(current);
-  const result = calculateStudent({ scores: current.scores, standard, gender: current.gender, status: current.status, bonus: current.bonus });
-  Object.assign(current, { total: result.total, baseTotal: result.baseTotal, bonus: result.bonus, grade: result.grade, gradeTone: result.gradeTone, itemResults: result.itemResults });
+  const result = calculateStudent({ scores: current.scores, standard, gender: current.gender, height: current.height, weight: current.weight, status: current.status, bonus: current.bonus });
+  if (result.bmiInfo) current.scores.bmi = result.bmiInfo.bmi;
+  Object.assign(current, { bmiInfo: result.bmiInfo, total: result.total, baseTotal: result.baseTotal, bonus: result.bonus, grade: result.grade, gradeTone: result.gradeTone, itemResults: result.itemResults });
   saveRecords();
   rosterRenderProject();
   rosterRenderFinal();
@@ -851,10 +945,20 @@ async function rosterImportListFile(file) {
   for (const student of parsed.students) {
     const get = (...labels) => labels.filter(Boolean).map((label) => student.fields[normalizeHeader(label)]).find((value) => value !== undefined && value !== "");
     student.status = statusFromText(student.statusText, "pending");
+    const height = get("身高", "身高（厘米）", "height");
+    const weight = get("体重", "体重（公斤）", "weight");
+    if (height !== undefined) {
+      if (!Number.isFinite(Number(height))) throw new Error(student.name + " 的身高不是数字。");
+      student.height = Number(height);
+    }
+    if (weight !== undefined) {
+      if (!Number.isFinite(Number(weight))) throw new Error(student.name + " 的体重不是数字。");
+      student.weight = Number(weight);
+    }
     student.scores = {};
     for (const eventId of EVENT_ORDER) {
       const definition = standard.events?.[eventId] || {};
-      const raw = get(eventId, definition.label, definition.maleLabel, definition.femaleLabel, EVENT_META[eventId].label);
+      const raw = get(eventId, definition.label, definition.maleLabel, definition.femaleLabel, EVENT_META[eventId].label, eventId === "bmi" ? "BMI值" : "");
       if (raw === undefined) continue;
       if (!Number.isFinite(Number(raw))) throw new Error(student.name + " 的“" + EVENT_META[eventId].label + "”不是数字，请修正后导入。");
       student.scores[eventId] = Number(raw);
@@ -916,6 +1020,14 @@ function rosterBindEvents() {
     $("#project-auto-save").textContent = "正在自动保存…";
   });
   $("#project-score-input").addEventListener("blur", () => rosterSaveProjectScore(true));
+  ["#project-height-input", "#project-weight-input"].forEach((selector) => {
+    $(selector).addEventListener("input", () => {
+      window.clearTimeout(rosterSaveTimer);
+      rosterSaveTimer = window.setTimeout(() => rosterSaveProjectScore(false), 150);
+      $("#project-auto-save").textContent = "正在自动保存…";
+    });
+    $(selector).addEventListener("blur", () => rosterSaveProjectScore(true));
+  });
   $("#project-status").addEventListener("change", rosterApplyProjectStatus);
   $("#project-prev").addEventListener("click", () => rosterMoveProjectStudent(-1));
   $("#project-skip").addEventListener("click", () => rosterMoveProjectStudent(1));
