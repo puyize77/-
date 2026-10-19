@@ -290,9 +290,11 @@ function escapeCsv(value) {
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-function exportCsv() {
-  const headers = ["姓名", "班级", "年级", "性别", "状态", "BMI", "肺活量", "50米跑", "坐位体前屈", "立定跳远", "力量项目", "耐力项目", "附加分", "总分", "等级"];
-  const lines = records.map((record) => [
+function exportTableData() {
+  const headers = ["序号", "姓名", "班级", "年级", "性别", "状态", "BMI", "肺活量", "50米跑", "坐位体前屈", "立定跳远", "力量项目", "耐力项目", "附加分", "总分", "等级"];
+  const ordered = [...records].sort((a, b) => (Number(a.rosterOrder) || 0) - (Number(b.rosterOrder) || 0));
+  const rows = ordered.map((record, index) => [
+    Number(record.rosterOrder) || index + 1,
     record.name,
     record.className,
     record.gradeLevel || "初三",
@@ -302,18 +304,144 @@ function exportCsv() {
     record.bonus ?? 0,
     record.total ?? "",
     record.grade ?? "",
-  ].map(escapeCsv).join(","));
+  ]);
+  return { headers, rows };
+}
+
+function exportCsv() {
+  const { headers, rows } = exportTableData();
+  const lines = rows.map((row) => row.map(escapeCsv).join(","));
   downloadFile("体育成绩记录.csv", `\ufeff${[headers.map(escapeCsv).join(","), ...lines].join("\n")}`, "text/csv;charset=utf-8");
 }
 
+function escapeXml(value) {
+  return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&apos;", '"': "&quot;" }[char]));
+}
+
+function excelColumnName(index) {
+  let value = index + 1;
+  let name = "";
+  while (value > 0) {
+    const remainder = (value - 1) % 26;
+    name = String.fromCharCode(65 + remainder) + name;
+    value = Math.floor((value - 1) / 26);
+  }
+  return name;
+}
+
+function excelCell(value, rowNumber, columnNumber, header = false) {
+  const reference = excelColumnName(columnNumber) + rowNumber;
+  const style = header ? ' s="1"' : "";
+  if (value !== null && value !== undefined && value !== "" && typeof value === "number" && Number.isFinite(value)) {
+    return `<c r="${reference}"${style}><v>${value}</v></c>`;
+  }
+  return `<c r="${reference}" t="inlineStr"${style}><is><t xml:space="preserve">${escapeXml(value)}</t></is></c>`;
+}
+
+function buildWorksheetXml(headers, rows) {
+  const allRows = [headers, ...rows];
+  const lastReference = `${excelColumnName(headers.length - 1)}${allRows.length}`;
+  const rowXml = allRows.map((row, rowIndex) => {
+    const cells = row.map((value, columnIndex) => excelCell(value, rowIndex + 1, columnIndex, rowIndex === 0)).join("");
+    return `<row r="${rowIndex + 1}">${cells}</row>`;
+  }).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${lastReference}"/><sheetViews><sheetView workbookViewId="0"/></sheetViews><sheetFormatPr defaultRowHeight="18"/><sheetData>${rowXml}</sheetData><autoFilter ref="A1:${lastReference}"/></worksheet>`;
+}
+
+function buildXlsxStylesXml() {
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFDCE6F1"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/><xf numFmtId="0" fontId="1" fillId="1" borderId="0" applyFont="1" applyFill="1"><alignment horizontal="center"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+}
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pushU16(target, value) {
+  target.push(value & 0xff, (value >>> 8) & 0xff);
+}
+
+function pushU32(target, value) {
+  target.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff);
+}
+
+function joinByteArrays(parts) {
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const result = new Uint8Array(total);
+  let offset = 0;
+  parts.forEach((part) => { result.set(part, offset); offset += part.length; });
+  return result;
+}
+
+function buildStoredZip(files) {
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  let localOffset = 0;
+  files.forEach(({ name, content }) => {
+    const nameBytes = encoder.encode(name);
+    const data = typeof content === "string" ? encoder.encode(content) : content;
+    const checksum = crc32(data);
+    const localHeader = [];
+    pushU32(localHeader, 0x04034b50);
+    pushU16(localHeader, 20); pushU16(localHeader, 0); pushU16(localHeader, 0); pushU16(localHeader, 0);
+    pushU16(localHeader, 0); pushU16(localHeader, 0); pushU32(localHeader, checksum);
+    pushU32(localHeader, data.length); pushU32(localHeader, data.length); pushU16(localHeader, nameBytes.length); pushU16(localHeader, 0);
+    localParts.push(Uint8Array.from(localHeader), nameBytes, data);
+
+    const centralHeader = [];
+    pushU32(centralHeader, 0x02014b50);
+    pushU16(centralHeader, 20); pushU16(centralHeader, 20); pushU16(centralHeader, 0); pushU16(centralHeader, 0);
+    pushU16(centralHeader, 0); pushU16(centralHeader, 0); pushU32(centralHeader, checksum);
+    pushU32(centralHeader, data.length); pushU32(centralHeader, data.length); pushU16(centralHeader, nameBytes.length);
+    pushU16(centralHeader, 0); pushU16(centralHeader, 0); pushU16(centralHeader, 0); pushU16(centralHeader, 0);
+    pushU32(centralHeader, 0); pushU32(centralHeader, localOffset);
+    centralParts.push(Uint8Array.from(centralHeader), nameBytes);
+    localOffset += 30 + nameBytes.length + data.length;
+  });
+  const centralDirectory = joinByteArrays(centralParts);
+  const endRecord = [];
+  pushU32(endRecord, 0x06054b50); pushU16(endRecord, 0); pushU16(endRecord, 0);
+  pushU16(endRecord, files.length); pushU16(endRecord, files.length); pushU32(endRecord, centralDirectory.length);
+  pushU32(endRecord, localOffset); pushU16(endRecord, 0);
+  return joinByteArrays([...localParts, centralDirectory, Uint8Array.from(endRecord)]);
+}
+
+function exportXlsx(filename = "体育成绩记录.xlsx") {
+  const { headers, rows } = exportTableData();
+  const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="成绩表" sheetId="1" r:id="rId1"/></sheets></workbook>`;
+  const relationshipsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`;
+  const rootRelationshipsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`;
+  const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`;
+  const bytes = buildStoredZip([
+    { name: "[Content_Types].xml", content: contentTypesXml },
+    { name: "_rels/.rels", content: rootRelationshipsXml },
+    { name: "xl/workbook.xml", content: workbookXml },
+    { name: "xl/_rels/workbook.xml.rels", content: relationshipsXml },
+    { name: "xl/worksheets/sheet1.xml", content: buildWorksheetXml(headers, rows) },
+    { name: "xl/styles.xml", content: buildXlsxStylesXml() },
+  ]);
+  downloadBlob(filename, bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+}
+
 function downloadFile(filename, content, type) {
+  downloadBlob(filename, new TextEncoder().encode(content), type);
+}
+
+function downloadBlob(filename, content, type) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
   anchor.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 function parseCsv(text) {
@@ -433,6 +561,10 @@ function bindEvents() {
   $("#filter-class").addEventListener("change", renderRecords);
   $("#analysis-class").addEventListener("change", renderAnalysis);
   $("#export-csv").addEventListener("click", exportCsv);
+  $("#export-xlsx").addEventListener("click", () => {
+    exportXlsx("体育成绩记录.xlsx");
+    showMessage("#list-message", "Excel 成绩表已下载。", "success");
+  });
   $("#import-csv").addEventListener("change", async (event) => {
     await rosterHandleFileInput(event, "#list-message");
   });
@@ -799,6 +931,10 @@ function rosterBindEvents() {
   $("#export-final-csv").addEventListener("click", () => {
     exportCsv();
     showMessage("#final-message", "成绩表已导出。", "success");
+  });
+  $("#export-final-xlsx").addEventListener("click", () => {
+    exportXlsx("体育最终成绩表.xlsx");
+    showMessage("#final-message", "Excel 成绩表已下载。", "success");
   });
 }
 
