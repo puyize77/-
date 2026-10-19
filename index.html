@@ -102,6 +102,7 @@
               <input id="search-input" placeholder="搜索姓名、班级或年级" aria-label="搜索记录" />
               <select id="filter-class" aria-label="按班级筛选"><option value="">全部班级</option></select>
               <button id="export-csv" class="button-secondary" type="button">导出 CSV</button>
+              <button id="export-xlsx" class="button-primary" type="button">导出 Excel</button>
               <label class="button-ghost" for="import-csv">导入名单 / 成绩<input id="import-csv" type="file" accept=".xlsx,.csv,.tsv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden /></label>
               <button id="clear-records" class="button-danger" type="button">清空记录</button>
             </div>
@@ -196,8 +197,9 @@
               <input id="final-search" placeholder="搜索姓名或班级" aria-label="搜索成绩表" />
               <select id="final-class-filter" aria-label="按班级筛选成绩表"><option value="">全部班级</option></select>
               <button id="export-final-csv" class="button-secondary" type="button">导出成绩表 CSV</button>
+              <button id="export-final-xlsx" class="button-primary" type="button">导出成绩表 Excel</button>
             </div>
-            <p class="final-note">成绩表会随着分项目测试自动更新。导出的 CSV 可以继续在 Excel 中整理或打印。</p>
+            <p class="final-note">成绩表会随着分项目测试自动更新。可以导出 Excel（.xlsx）或 CSV 文件，用 Excel、WPS 打开和打印。</p>
             <div class="table-wrap">
               <table class="records-table final-table">
                 <thead><tr><th>顺序</th><th>姓名</th><th>班级</th><th>性别</th><th>状态</th><th>BMI</th><th>肺活量</th><th>50米</th><th>体前屈</th><th>跳远</th><th>力量</th><th>耐力</th><th>总分</th><th>等级</th></tr></thead>
@@ -283,6 +285,6 @@
         本工具用于成绩录入和统计辅助。正式使用前，请由学校或当地主管部门确认评分标准、附加分和缺考/免测统计口径。
       </footer>
     </main>
-    <script type="module" src="./src/app.js?v=20261018-4"></script>
+    <script type="module" src="./src/app.js?v=20261019-1"></script>
   </body>
 </html>
