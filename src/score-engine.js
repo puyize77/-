@@ -1,3 +1,5 @@
+import { calculateHeightWeight } from "./bmi-standard.js";
+
 export const EVENT_ORDER = [
   "bmi",
   "vitalCapacity",
@@ -9,7 +11,7 @@ export const EVENT_ORDER = [
 ];
 
 export const EVENT_META = {
-  bmi: { label: "BMI", unit: "", inputMode: "decimal" },
+  bmi: { label: "BMI", unit: "kg/m²", inputMode: "decimal" },
   vitalCapacity: { label: "肺活量", unit: "毫升", inputMode: "numeric" },
   sprint50: { label: "50米跑", unit: "秒", inputMode: "decimal" },
   sitReach: { label: "坐位体前屈", unit: "厘米", inputMode: "decimal" },
@@ -26,7 +28,7 @@ export const EVENT_META = {
 export const DEFAULT_STANDARD = {
   version: 1,
   title: "初中体测演示评分表（需替换）",
-  note: "演示数据仅用于验证流程，不代表任何地区的正式评分标准。",
+  note: "BMI 身高体重分段按上传的中考体育成绩标准表计算；其他项目仍需在评分设置中替换为学校正式标准。",
   totalMax: 100,
   weights: {
     bmi: 15,
@@ -237,13 +239,16 @@ export function eventRule(standard, eventId, gender) {
   return { ...definition, thresholds };
 }
 
-export function calculateStudent({ scores = {}, standard = DEFAULT_STANDARD, gender = "male", status = "active", bonus = 0 }) {
+export function calculateStudent({ scores = {}, standard = DEFAULT_STANDARD, gender = "male", status = "active", bonus = 0, height = null, weight = null }) {
+  const heightWeight = calculateHeightWeight({ height, weight, gender });
   const itemResults = EVENT_ORDER.map((eventId) => {
     const definition = standard.events?.[eventId] || {};
-    const raw = toNumber(scores[eventId]);
-    const points = eventRule(standard, eventId, gender)
-      ? scoreEvent(raw, eventRule(standard, eventId, gender))
-      : null;
+    const raw = eventId === "bmi" && heightWeight ? heightWeight.bmi : toNumber(scores[eventId]);
+    const points = eventId === "bmi" && heightWeight
+      ? heightWeight.score
+      : eventRule(standard, eventId, gender)
+        ? scoreEvent(raw, eventRule(standard, eventId, gender))
+        : null;
     const weight = toNumber(standard.weights?.[eventId]) || 0;
     return {
       eventId,
@@ -251,6 +256,7 @@ export function calculateStudent({ scores = {}, standard = DEFAULT_STANDARD, gen
       points,
       weight,
       weighted: points === null ? null : (points * weight) / 100,
+      category: eventId === "bmi" ? heightWeight?.category || null : null,
       label: gender === "female" && definition.femaleLabel
         ? definition.femaleLabel
         : gender === "male" && definition.maleLabel
@@ -273,6 +279,7 @@ export function calculateStudent({ scores = {}, standard = DEFAULT_STANDARD, gen
 
   return {
     itemResults,
+    bmiInfo: heightWeight,
     complete,
     total,
     baseTotal: weightedTotal,
