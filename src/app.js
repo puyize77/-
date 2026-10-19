@@ -391,7 +391,7 @@ function buildStoredZip(files) {
     const localHeader = [];
     pushU32(localHeader, 0x04034b50);
     pushU16(localHeader, 20); pushU16(localHeader, 0); pushU16(localHeader, 0); pushU16(localHeader, 0);
-    pushU16(localHeader, 0); pushU16(localHeader, 0); pushU32(localHeader, checksum);
+    pushU16(localHeader, 0); pushU32(localHeader, checksum);
     pushU32(localHeader, data.length); pushU32(localHeader, data.length); pushU16(localHeader, nameBytes.length); pushU16(localHeader, 0);
     localParts.push(Uint8Array.from(localHeader), nameBytes, data);
 
