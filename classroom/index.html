@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f2f5ef">
+  <meta name="description" content="初中体育课堂的单项换分、综合测试和日期考勤工具。">
+  <title>体育课堂 · 手机工作台</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="rules.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <svg class="symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-logo" viewBox="0 0 24 24"><path d="M3 17.5h4l4-11h3l-4 11h3.5l4-11H21"/><path d="M3 12h3.5m11 0H21"/></symbol>
+    <symbol id="i-score" viewBox="0 0 24 24"><rect x="4.5" y="3" width="15" height="18" rx="2"/><path d="M8 8h8m-8 5h1m6 0h1m-8 4h1m6 0h1"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 10h16m-11 5 2 2 4-4"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2M16 5a3 3 0 0 1 0 6m2 3a4 4 0 0 1 3 4v2"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11m-4-4 4 4 4-4M5 16v4h14v-4"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+  </svg>
+  <header class="top">
+    <div class="top-inner">
+      <a class="brand" href="#score" aria-label="体育课堂首页"><span class="logo"><svg><use href="#i-logo"/></svg></span><span>体育课堂<small>初中体育工作台</small></span></a>
+      <nav class="nav" aria-label="工作台导航">
+        <a href="#score" id="nav-score"><svg><use href="#i-score"/></svg>成绩评分</a>
+        <a href="#attendance" id="nav-attendance"><svg><use href="#i-check"/></svg>日期点名</a>
+      </nav>
+      <button type="button" class="button secondary roster-open" id="open-roster"><svg><use href="#i-users"/></svg>学生名单</button>
+    </div>
+  </header>
+  <main class="shell">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="kicker"><span></span> 初中体育 · 课堂工作台</p>
+        <h1 id="hero-title">体育成绩与考勤</h1>
+        <p>录入成绩即时换分，按日期完成班级点名。</p>
+      </div>
+      <svg class="track" viewBox="0 0 460 238" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
+        <g fill="none" stroke="currentColor">
+          <rect x="85" y="25" width="490" height="190" rx="95" transform="rotate(-18 330 120)"/>
+          <rect x="104" y="43" width="452" height="154" rx="77" transform="rotate(-18 330 120)"/>
+          <rect x="124" y="61" width="412" height="118" rx="59" transform="rotate(-18 330 120)"/>
+          <rect x="144" y="79" width="372" height="82" rx="41" transform="rotate(-18 330 120)"/>
+          <rect x="164" y="97" width="332" height="46" rx="23" transform="rotate(-18 330 120)"/>
+          <path d="m315 20 64 195m-81-190 64 195" stroke-dasharray="4 5"/>
+          <circle cx="230" cy="130" r="5" fill="currentColor" stroke="none"/>
+          <circle cx="210" cy="155" r="4" fill="currentColor" stroke="none"/>
+        </g>
+      </svg>
+    </section>
+    <div class="layout">
+      <div class="workspace">
+        <section id="page-score" aria-labelledby="score-title">
+          <section class="card">
+            <div class="section-head">
+              <div><p class="eyebrow">成绩录入</p><h2 id="score-title">成绩换算</h2></div>
+              <span class="tag">百分制</span>
+            </div>
+            <div class="segments" aria-label="测试类型">
+              <button type="button" data-mode="single" aria-pressed="true">单项测试</button>
+              <button type="button" data-mode="composite" aria-pressed="false">综合测试</button>
+            </div>
+            <div class="fields split score-options">
+              <label id="score-item-label">测试项目<select id="score-item">
+                <option value="jump">立定跳远</option><option value="ball">掷实心球</option>
+                <option value="run">耐久跑</option><option value="weight">身高标准体重</option>
+              </select></label>
+              <label>性别标准<select id="score-sex"><option value="m">男生</option><option value="f">女生</option></select></label>
+            </div>
+            <div id="score-inputs" class="score-inputs"></div>
+            <div class="result" aria-live="polite">
+              <div><p id="result-label">单项得分</p><div class="result-number"><strong id="result-number">—</strong><span> / 100</span></div><p id="result-note" class="result-note">填写成绩后立即换算</p></div>
+              <div id="result-grade" class="result-grade"><span>等级</span><strong>—</strong></div>
+            </div>
+            <div class="fields split score-save-fields">
+              <label>测试日期<input id="score-date" type="date"></label>
+              <label>学生<select id="score-student"></select></label>
+            </div>
+            <p class="hint">选好学生，就能把成绩保存到当天的成绩表。</p>
+            <div class="actions">
+              <button type="button" id="clear-score" class="button secondary">清空输入</button>
+              <button type="button" id="save-score" class="button primary" disabled>保存成绩</button>
+            </div>
+          </section>
+          <section class="card">
+            <div class="section-head">
+              <div><p class="eyebrow">测试记录</p><h2 id="score-record-title">当日成绩表</h2></div>
+              <button type="button" id="export-scores" class="button secondary compact" disabled><svg><use href="#i-down"/></svg>导出 CSV</button>
+            </div>
+            <div class="fields split" id="score-record-controls" hidden>
+              <label>有记录的日期<select id="score-history"></select></label>
+              <label>班级筛选<select id="score-class"></select></label>
+            </div>
+            <div id="score-stats" class="stats" hidden></div>
+            <div id="score-records"></div>
+          </section>
+        </section>
+        <section id="page-attendance" aria-labelledby="attendance-title" hidden>
+          <section class="card">
+            <div class="section-head">
+              <div><p class="eyebrow">按日登记</p><h2 id="attendance-title">考勤表</h2></div>
+              <button type="button" id="export-attendance" class="button secondary compact" disabled><svg><use href="#i-down"/></svg>导出 CSV</button>
+            </div>
+            <div class="fields split">
+              <label>点名日期<input id="attendance-date" type="date"></label>
+              <label>班级<select id="attendance-class"></select></label>
+            </div>
+            <div class="fields split attendance-filters">
+              <label>历史考勤<select id="attendance-history"></select></label>
+              <label>查找学生<input id="attendance-search" type="search" placeholder="姓名或学号" autocomplete="off"></label>
+            </div>
+            <div id="attendance-stats" class="stats attendance-stats" aria-live="polite"></div>
+            <div class="attendance-toolbar">
+              <p class="hint">点选状态即保存，再点一次可取消。</p>
+              <button type="button" id="mark-present" class="button secondary compact" disabled>未登记设为出勤</button>
+            </div>
+            <div id="attendance-list"></div>
+          </section>
+        </section>
+      </div>
+      <aside class="aside" aria-label="使用说明">
+        <section class="card guide">
+          <div class="guide-icon"><svg><use href="#i-list"/></svg></div>
+          <h2>等级标准</h2>
+          <dl class="grade-scale">
+            <div><dt><span class="pill grade-A">A</span> 优秀</dt><dd>90–100 分</dd></div>
+            <div><dt><span class="pill grade-B">B</span> 良好</dt><dd>75–89.9 分</dd></div>
+            <div><dt><span class="pill grade-C">C</span> 及格</dt><dd>60–74.9 分</dd></div>
+            <div><dt><span class="pill grade-D">D</span> 不及格</dt><dd>低于 60 分</dd></div>
+          </dl>
+          <details>
+            <summary>查看换分规则</summary>
+            <p>依据你提供的《中考体育成绩标准》。运动项目按达到的最高档计分，低于表内 10 分档计 0 分。</p>
+            <p>综合分＝（跳远分＋实心球分＋耐久跑分）× 0.3 ＋身高标准体重分 × 0.1。</p>
+            <p>身高体重按 0.1 为单位。表中重叠的体重区间按后一档下限判定，超出身高表范围时按附件的换算注释处理。</p>
+          </details>
+        </section>
+        <section class="card guide storage">
+          <p class="eyebrow"><span></span> 本机记录</p>
+          <p>名单、考勤和成绩保存在当前浏览器。需要留档时，可导出 CSV，用 Excel 或 WPS 查看。</p>
+          <div class="backup-actions">
+            <button type="button" class="text-button" id="backup-data">备份全部记录</button>
+            <button type="button" class="text-button" id="restore-data">恢复备份</button>
+            <input id="restore-file" type="file" accept=".json,application/json" hidden>
+          </div>
+        </section>
+      </aside>
+    </div>
+    <footer class="foot">体育课堂 <span>·</span> 评分依据为上传的体育成绩标准</footer>
+  </main>
+  <dialog id="roster-dialog" aria-labelledby="roster-title">
+    <div class="dialog-body">
+      <div class="section-head">
+        <div><p class="eyebrow">班级管理</p><h2 id="roster-title">学生名单</h2></div>
+        <button type="button" id="close-roster" class="button secondary icon-button" aria-label="关闭学生名单"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <form id="roster-form">
+        <div class="fields split">
+          <label>班级<input id="roster-class" maxlength="40" required placeholder="如 初三（1）班" list="class-list"><datalist id="class-list"></datalist></label>
+          <label>性别<select id="roster-sex"><option value="m">男生</option><option value="f">女生</option></select></label>
+        </div>
+        <label>姓名或批量名单<textarea id="roster-names" rows="4" required maxlength="12000" placeholder="一行一人，如：&#10;张同学&#10;李同学,02"></textarea></label>
+        <p class="hint">同一班、同一性别可一次添加多人。一行一个姓名，也可填「姓名,学号」。</p>
+        <button class="button primary full" type="submit">添加到名单</button>
+        <p id="roster-feedback" class="hint" role="status"></p>
+      </form>
+      <div id="roster-list"></div>
+    </div>
+  </dialog>
+  <div id="storage-warning" class="storage-warning" role="alert" hidden></div>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>
