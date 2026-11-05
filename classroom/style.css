@@ -39,7 +39,7 @@ h2{font-size:23px;line-height:1.25;margin:0}
 .fields{display:grid;gap:11px;margin-bottom:11px}
 .split{grid-template-columns:repeat(2,minmax(0,1fr))}
 label{display:block;min-width:0;color:#31483c;font-size:13px;font-weight:700}
-input:not([type=file]),select,textarea{display:block;width:100%;min-width:0;min-height:46px;margin-top:4px;border:1px solid #d8e2d7;border-radius:10px;background:#fbfdfa;color:var(--ink);padding:9px 10px;font-size:16px;font-weight:500}
+input:not([type=file]):not([type=checkbox]),select,textarea{display:block;width:100%;min-width:0;min-height:46px;margin-top:4px;border:1px solid #d8e2d7;border-radius:10px;background:#fbfdfa;color:var(--ink);padding:9px 10px;font-size:16px;font-weight:500}
 input[type=date]{min-inline-size:0;-webkit-min-logical-width:0}
 input:focus,select:focus,textarea:focus{outline:2px solid #81a769;outline-offset:1px}
 input[aria-invalid=true]{border-color:#ad4d3d}
@@ -105,7 +105,39 @@ details p{margin:8px 0 0}
 .foot{text-align:center;color:var(--muted);font-size:12px;padding:1px 0 22px}.foot span{margin:0 4px}
 dialog{padding:0;border:1px solid var(--line);border-radius:18px;width:min(480px,calc(100% - 20px));max-height:calc(100% - 24px);color:var(--ink);box-shadow:0 20px 70px #0a241855}
 dialog::backdrop{background:#152b24a0}.dialog-body{padding:18px}
-.roster-row .button{flex:none}
+.roster-import {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: #f4f8f0;
+}
+.roster-import h3 { margin: 0; font-size: 16px; }
+.roster-import-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.roster-manual { margin: 9px 0; }
+.roster-manual summary { padding: 10px 0; }
+.roster-tools {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 8px 0;
+  background: var(--paper);
+}
+.roster-batch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 7px; }
+.roster-check { display: flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; }
+.roster-row { justify-content: flex-start; min-height: 50px; cursor: pointer; }
+.roster-check input, .roster-row input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--green);
+}
+.roster-record-tag { margin-left: auto; white-space: nowrap; }
+.roster-batch .danger { margin-left: auto; }
+.danger { color: #8b382e; background: #fff5f3; border-color: #e8c9c4; }
+.danger:not(:disabled):hover { background: #fae5e1; }
+.roster-delete-actions { display: flex; justify-content: flex-end; gap: 8px; }
+#roster-file-feedback, #roster-delete-feedback { overflow-wrap: anywhere; }
 .toast,.storage-warning{position:fixed;z-index:5;left:50%;transform:translateX(-50%);bottom:18px;width:max-content;max-width:calc(100% - 24px);background:#173f33;color:white;border-radius:10px;padding:8px 13px;font-size:13px;box-shadow:0 5px 15px #203e3350}
 .storage-warning{top:5px;bottom:auto;background:#763f28}
 @media(max-width:750px){

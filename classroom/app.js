@@ -6,11 +6,14 @@ const STATUSES = { present: '出勤', leave: '请假', absent: '旷课' };
 const GRADE_LABELS = { A: '优秀', B: '良好', C: '及格', D: '不及格' };
 const attendanceList = $('attendance-list');
 const rosterDialog = $('roster-dialog');
+const rosterDeleteDialog = $('roster-delete-dialog');
+const rosterSelection = new Set();
 const scoreInputs = $('score-inputs');
 let mode = 'single';
 let lastScoreStudent = '';
 let toastTimer;
 let nextTab;
+let pendingRosterDeletion;
 let state = { students: [], attendance: [], scores: [] };
 
 function today() {
@@ -161,16 +164,41 @@ function showPage() {
 
 function rosterRows() {
   const used = new Set([...state.attendance, ...state.scores].map((row) => row.student));
-  const students = sortedStudents();
+  const filter = $('roster-class-filter');
+  options(filter, classNames().map((name) => [name, name]));
+  const students = sortedStudents().filter((s) => !filter.value || s.className === filter.value);
+  const visibleIds = new Set(students.map((s) => s.id));
+  for (const id of rosterSelection) if (!visibleIds.has(id)) rosterSelection.delete(id);
+  filter.disabled = !state.students.length;
   $('roster-list').innerHTML = students.length ? students.map((s) =>
-    '<div class="roster-row">' + person(s, SEX[s.sex]) +
-    (used.has(s.id) ? '<span class="hint">已有记录</span>' :
-      '<button type="button" class="button secondary compact" data-remove-student="' +
-      safe(s.id) + '" aria-label="移除 ' + safe(s.name) + '">移除</button>') + '</div>'
-  ).join('') : empty('添加名单后就可以点名和保存测试成绩。');
+    '<label class="roster-row"><input type="checkbox" data-roster-id="' + safe(s.id) +
+    '"' + (rosterSelection.has(s.id) ? ' checked' : '') + '><span class="person"><strong>' +
+    safe(s.name) + '</strong><small>' + safe(studentInfo(s, true)) + '</small></span>' +
+    (used.has(s.id) ? '<span class="hint roster-record-tag">已有记录</span>' : '') + '</label>'
+  ).join('') : empty('导入学生名单后即可点名和保存成绩。');
+  updateRosterSelection();
+}
+
+function updateRosterSelection() {
+  const total = $('roster-list').querySelectorAll('[data-roster-id]').length;
+  const selected = rosterSelection.size;
+  const all = $('roster-select-all');
+  all.checked = total > 0 && selected === total;
+  all.indeterminate = selected > 0 && selected < total;
+  all.disabled = !total;
+  $('roster-selection-count').textContent = '已选 ' + selected + ' 人';
+  $('roster-delete').disabled = !selected;
+}
+
+function rosterMessage(id, message) {
+  const feedback = $(id);
+  feedback.textContent = message;
+  feedback.hidden = !message;
 }
 
 function openRoster() {
+  rosterSelection.clear();
+  rosterMessage('roster-delete-feedback', '');
   rosterRows();
   $('roster-feedback').textContent = '';
   rosterDialog.showModal();
@@ -180,6 +208,129 @@ $('open-roster').addEventListener('click', openRoster);
 $('close-roster').addEventListener('click', () => rosterDialog.close());
 document.addEventListener('click', (event) => {
   if (event.target.closest('[data-roster]')) openRoster();
+});
+
+function refreshRoster() {
+  const student = $('score-student').value;
+  initSelectors();
+  if (student !== $('score-student').value) {
+    setupScore();
+  } else {
+    updateResult();
+    renderScoreRecords();
+  }
+  renderAttendance();
+  rosterRows();
+}
+
+function addRosterStudents(students) {
+  let added = 0;
+  if (!writeState((data) => {
+    const names = new Set(), unnumbered = new Set(), numbers = new Set();
+    const nameKey = (s) => JSON.stringify([s.className, s.name, s.sex]);
+    const numberKey = (s) => JSON.stringify([s.className, s.number]);
+    function track(student) {
+      const name = nameKey(student);
+      names.add(name);
+      if (student.number) numbers.add(numberKey(student));
+      else unnumbered.add(name);
+    }
+    data.students.forEach(track);
+    for (const student of students) {
+      const name = nameKey(student);
+      const duplicate = student.number
+        ? numbers.has(numberKey(student)) || unnumbered.has(name)
+        : names.has(name);
+      if (duplicate) continue;
+      const id = Array.from(crypto.getRandomValues(new Uint8Array(16)),
+        (byte) => byte.toString(16).padStart(2, '0')).join('');
+      data.students.push({ ...student, id });
+      track(student);
+      added++;
+    }
+  })) return null;
+  refreshRoster();
+  return added;
+}
+
+const rosterColumns = {
+  name: ['姓名', '学生姓名', 'name'],
+  className: ['班级', '班级名称', '所属班级', 'class', 'classname'],
+  sex: ['性别', '学生性别', 'gender', 'sex'],
+  number: ['学号', '学籍号', '学生编号', '编号', '序号', 'studentid', 'number'],
+};
+const rosterCell = (value) => String(value ?? '').trim();
+const rosterHeader = (value) => rosterCell(value).replace(/\s+/g, '').toLowerCase();
+
+function rosterEntries(sheets) {
+  const entries = [];
+  let invalid = 0, firstInvalid = '';
+  for (const sheet of sheets) {
+    const header = sheet.rows.findIndex((row) => {
+      const keys = row.map(rosterHeader);
+      return ['name', 'className', 'sex'].every((field) =>
+        rosterColumns[field].some((alias) => keys.includes(alias)));
+    });
+    if (header < 0) continue;
+    const keys = sheet.rows[header].map(rosterHeader);
+    const columns = Object.values(rosterColumns).map((aliases) =>
+      aliases.map((alias) => keys.indexOf(alias)).find((index) => index >= 0) ?? -1);
+    for (const row of sheet.rows.slice(header + 1)) {
+      const [name, className, gender, number] = columns.map((column) => rosterCell(row[column]));
+      if (!name && !className && !gender && !number) continue;
+      if (rosterColumns.name.includes(rosterHeader(name)) &&
+          rosterColumns.className.includes(rosterHeader(className)) &&
+          rosterColumns.sex.includes(rosterHeader(gender))) continue;
+      const code = rosterHeader(gender);
+      const sex = /^(男|男生|男性|m|male)$/.test(code) ? 'm' :
+        /^(女|女生|女性|f|female)$/.test(code) ? 'f' : '';
+      if (!name || !className || !sex || name.length > 40 || className.length > 40 || number.length > 30) {
+        invalid++;
+        if (!firstInvalid) firstInvalid = '「' + sheet.name + '」中的' +
+          (name ? '「' + name.slice(0, 40) + '」' : '一条记录') + '需要检查姓名、班级、性别或学号。';
+        continue;
+      }
+      entries.push({ name, className, sex, number });
+    }
+  }
+  if (!entries.length) throw new Error(firstInvalid ||
+    '没有找到可导入的学生。请使用含「姓名、班级、性别」表头的名单，性别填男或女。');
+  return { entries, invalid, firstInvalid };
+}
+
+$('roster-import-file').addEventListener('click', () => $('roster-file').click());
+$('roster-template').addEventListener('click', () => exportCsv('体育课堂名单模板', [
+  ['姓名', '班级', '性别', '学号'],
+  ['张同学', '初三（1）班', '男', '01'],
+  ['李同学', '初三（1）班', '女', '02'],
+]));
+$('roster-file').addEventListener('change', async (event) => {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  const button = $('roster-import-file');
+  button.disabled = true;
+  rosterMessage('roster-file-feedback', '正在读取名单…');
+  try {
+    const { readRosterFile } = await import('../src/roster-import.js');
+    const { entries, invalid, firstInvalid } = rosterEntries(await readRosterFile(file));
+    const added = addRosterStudents(entries);
+    if (added === null) {
+      rosterMessage('roster-file-feedback', '名单未能保存，请检查浏览器存储后重试。');
+      return;
+    }
+    const duplicate = entries.length - added;
+    let message = '已导入 ' + added + ' 人';
+    if (duplicate) message += '，跳过 ' + duplicate + ' 条重复记录';
+    if (invalid) message += '，跳过 ' + invalid + ' 条无效记录';
+    rosterMessage('roster-file-feedback', message + '。' + firstInvalid);
+  } catch (error) {
+    rosterMessage('roster-file-feedback', error instanceof TypeError
+      ? '无法读取名单，请刷新页面重试，或将表格另存为 CSV 后导入。'
+      : error.message || '无法读取名单，请检查文件格式。');
+  } finally {
+    button.disabled = false;
+  }
 });
 
 $('roster-form').addEventListener('submit', (event) => {
@@ -197,42 +348,68 @@ $('roster-form').addEventListener('submit', (event) => {
     feedback.textContent = '请检查名单，每行填写姓名，或用逗号分开姓名与学号。';
     return;
   }
-  let added = 0;
-  const success = writeState((data) => {
-    for (const [name, number = ''] of rows) {
-      const duplicate = data.students.some((s) => s.className === className &&
-        (number ? s.number === number : s.name === name && s.sex === sex));
-      if (duplicate) continue;
-      data.students.push({ id: Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, '0')).join(''), name, className, sex, number });
-      added++;
-    }
-  });
-  if (!success) return;
+  const added = addRosterStudents(rows.map(([name, number = '']) => ({ name, className, sex, number })));
+  if (added === null) {
+    feedback.textContent = '名单未能保存，请检查浏览器存储后重试。';
+    return;
+  }
   $('roster-names').value = '';
   feedback.textContent = '已添加 ' + added + ' 人' + (added < rows.length ? '，跳过 ' + (rows.length - added) + ' 条重复记录。' : '。');
-  initSelectors();
-  updateResult();
-  renderScoreRecords();
-  renderAttendance();
-  rosterRows();
 });
 
-$('roster-list').addEventListener('click', (event) => {
-  const button = event.target.closest('[data-remove-student]');
-  if (!button) return;
-  const student = state.students.find((s) => s.id === button.dataset.removeStudent);
-  if (!student || !confirm('移除「' + student.name + '」？')) return;
-  if (writeState((data) => {
-    if ([...data.attendance, ...data.scores].some((row) => row.student === student.id)) {
-      throw new Error('Student has existing records');
-    }
-    data.students = data.students.filter((s) => s.id !== student.id);
-  })) {
-    initSelectors();
-    setupScore();
-    renderAttendance();
-    rosterRows();
+$('roster-class-filter').addEventListener('change', () => {
+  rosterSelection.clear();
+  rosterMessage('roster-delete-feedback', '');
+  rosterRows();
+});
+$('roster-list').addEventListener('change', (event) => {
+  const { checked, dataset } = event.target;
+  if (!dataset.rosterId) return;
+  if (checked) rosterSelection.add(dataset.rosterId);
+  else rosterSelection.delete(dataset.rosterId);
+  updateRosterSelection();
+});
+$('roster-select-all').addEventListener('change', (event) => {
+  rosterSelection.clear();
+  for (const checkbox of $('roster-list').querySelectorAll('[data-roster-id]')) {
+    checkbox.checked = event.target.checked;
+    if (checkbox.checked) rosterSelection.add(checkbox.dataset.rosterId);
   }
+  updateRosterSelection();
+});
+$('roster-delete').addEventListener('click', () => {
+  const selected = new Set(rosterSelection);
+  if (!selected.size) return;
+  const picked = (row) => selected.has(row.student);
+  const scoreCount = state.scores.filter(picked).length;
+  const attendanceCount = state.attendance.filter(picked).length;
+  const records = scoreCount || attendanceCount
+    ? '相关的 ' + scoreCount + ' 条成绩、' + attendanceCount + ' 条考勤也会一并删除。'
+    : '';
+  pendingRosterDeletion = selected;
+  $('roster-delete-detail').textContent = '删除所选的 ' + selected.size + ' 名学生？' + records;
+  rosterDeleteDialog.returnValue = '';
+  rosterDeleteDialog.showModal();
+});
+rosterDeleteDialog.addEventListener('close', () => {
+  const selected = pendingRosterDeletion;
+  pendingRosterDeletion = undefined;
+  if (rosterDeleteDialog.returnValue !== 'delete' || !selected?.size) return;
+  const picked = (row) => selected.has(row.student);
+  let deleted;
+  if (!writeState((data) => {
+    const previous = data.students.length;
+    data.students = data.students.filter((student) => !selected.has(student.id));
+    data.scores = data.scores.filter((row) => !picked(row));
+    data.attendance = data.attendance.filter((row) => !picked(row));
+    deleted = previous - data.students.length;
+  })) {
+    rosterMessage('roster-delete-feedback', '删除未能保存，请检查浏览器存储后重试。');
+    return;
+  }
+  rosterSelection.clear();
+  refreshRoster();
+  rosterMessage('roster-delete-feedback', '已删除 ' + deleted + ' 名学生。');
 });
 
 function currentStudent() {

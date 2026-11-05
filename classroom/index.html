@@ -7,9 +7,9 @@
   <meta name="description" content="初中体育课堂的单项换分、综合测试和日期考勤工具。">
   <title>体育课堂 · 手机工作台</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=2">
   <script defer src="rules.js"></script>
-  <script defer src="app.js"></script>
+  <script defer src="app.js?v=2"></script>
 </head>
 <body>
   <svg class="symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -157,17 +157,49 @@
         <div><p class="eyebrow">班级管理</p><h2 id="roster-title">学生名单</h2></div>
         <button type="button" id="close-roster" class="button secondary icon-button" aria-label="关闭学生名单"><svg><use href="#i-close"/></svg></button>
       </div>
-      <form id="roster-form">
-        <div class="fields split">
-          <label>班级<input id="roster-class" maxlength="40" required placeholder="如 初三（1）班" list="class-list"><datalist id="class-list"></datalist></label>
-          <label>性别<select id="roster-sex"><option value="m">男生</option><option value="f">女生</option></select></label>
+      <section class="roster-import" aria-labelledby="roster-import-title">
+        <h3 id="roster-import-title">批量导入名单</h3>
+        <p class="hint">支持 Excel（.xlsx）和 CSV。表头填写姓名、班级、性别，学号可选。性别填男或女。</p>
+        <div class="roster-import-actions">
+          <button type="button" class="button primary" id="roster-import-file">选择名单文件</button>
+          <button type="button" class="button secondary" id="roster-template">下载 CSV 模板</button>
+          <input id="roster-file" type="file" accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden>
         </div>
-        <label>姓名或批量名单<textarea id="roster-names" rows="4" required maxlength="12000" placeholder="一行一人，如：&#10;张同学&#10;李同学,02"></textarea></label>
-        <p class="hint">同一班、同一性别可一次添加多人。一行一个姓名，也可填「姓名,学号」。</p>
-        <button class="button primary full" type="submit">添加到名单</button>
-        <p id="roster-feedback" class="hint" role="status"></p>
-      </form>
+        <p id="roster-file-feedback" class="hint" role="status" hidden></p>
+      </section>
+      <details class="roster-manual">
+        <summary>手动添加或粘贴名单</summary>
+        <form id="roster-form">
+          <div class="fields split">
+            <label>班级<input id="roster-class" maxlength="40" required placeholder="如 初三（1）班" list="class-list"><datalist id="class-list"></datalist></label>
+            <label>性别<select id="roster-sex"><option value="m">男生</option><option value="f">女生</option></select></label>
+          </div>
+          <label>姓名或批量名单<textarea id="roster-names" rows="4" required maxlength="12000" placeholder="一行一人，如：&#10;张同学&#10;李同学,02"></textarea></label>
+          <p class="hint">同一班、同一性别可一次添加多人。一行一个姓名，也可填「姓名,学号」。</p>
+          <button class="button primary full" type="submit">添加到名单</button>
+          <p id="roster-feedback" class="hint" role="status"></p>
+        </form>
+      </details>
+      <div class="roster-tools">
+        <label>筛选名单<select id="roster-class-filter"></select></label>
+        <div class="roster-batch">
+          <label class="roster-check"><input id="roster-select-all" type="checkbox">全选当前名单</label>
+          <span id="roster-selection-count" class="hint" aria-live="polite">已选 0 人</span>
+          <button type="button" class="button danger" id="roster-delete" disabled>批量删除</button>
+        </div>
+      </div>
+      <p id="roster-delete-feedback" class="hint" role="status" hidden></p>
       <div id="roster-list"></div>
+    </div>
+  </dialog>
+  <dialog id="roster-delete-dialog" aria-labelledby="roster-delete-title" aria-describedby="roster-delete-detail">
+    <div class="dialog-body">
+      <h2 id="roster-delete-title">确认批量删除</h2>
+      <p id="roster-delete-detail"></p>
+      <form method="dialog" class="roster-delete-actions">
+        <button type="submit" value="cancel" class="button secondary" autofocus>取消</button>
+        <button type="submit" value="delete" class="button danger">确认删除</button>
+      </form>
     </div>
   </dialog>
   <div id="storage-warning" class="storage-warning" role="alert" hidden></div>
